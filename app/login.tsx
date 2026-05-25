@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { useColors } from "@/hooks/use-colors";
 
 export default function LoginScreen() {
+  // All hooks must be called before any conditional returns
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, refresh } = useAuth();
   const colors = useColors();
@@ -28,7 +29,7 @@ export default function LoginScreen() {
     if (isAuthenticated && !authLoading && getProfileQuery.data) {
       router.replace("/(protected)/(tabs)");
     }
-  }, [isAuthenticated, authLoading, getProfileQuery.data]);
+  }, [isAuthenticated, authLoading, getProfileQuery.data, router]);
 
   const handleLogin = async () => {
     try {
@@ -76,6 +77,7 @@ export default function LoginScreen() {
     }
   };
 
+  // Now we can have conditional returns after all hooks are called
   if (authLoading) {
     return (
       <ScreenContainer className="items-center justify-center">

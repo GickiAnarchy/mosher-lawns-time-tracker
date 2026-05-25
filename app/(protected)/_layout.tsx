@@ -4,10 +4,11 @@ import { ActivityIndicator, View } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 
 export default function ProtectedLayout() {
+  // All hooks must be called before any conditional returns
   const { isAuthenticated, loading } = useAuth();
+  const colors = useColors();
 
   if (loading) {
-    const colors = useColors();
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color={colors.primary} />

@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, employees, InsertEmployee, Employee, jobSites, InsertJobSite, JobSite, timeLogs, InsertTimeLog, TimeLog } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -18,6 +18,19 @@ export async function getDb() {
   return _db;
 }
 
+export async function getUserByOpenId(openId: string): Promise<any | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
@@ -29,64 +42,154 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     return;
   }
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
+  const existingUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, user.openId))
+    .limit(1);
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
+  if (existingUser.length > 0) {
+    await db
+      .update(users)
+      .set({
+        name: user.name,
+        email: user.email,
+        lastSignedIn: new Date(),
+      })
+      .where(eq(users.openId, user.openId));
+  } else {
+    await db.insert(users).values(user);
   }
 }
 
-export async function getUserByOpenId(openId: string) {
+// Employee functions
+export async function getEmployeeByUserId(userId: number): Promise<Employee | null> {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
+  if (!db) return null;
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(employees)
+    .where(eq(employees.userId, userId))
+    .limit(1);
 
-  return result.length > 0 ? result[0] : undefined;
+  return result.length > 0 ? result[0] : null;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function createEmployee(data: InsertEmployee): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(employees).values(data);
+  return (result as any).insertId || 0;
+}
+
+export async function updateEmployee(id: number, data: Partial<InsertEmployee>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(employees).set(data).where(eq(employees.id, id));
+}
+
+// Job Sites functions
+export async function getActiveJobSites(): Promise<JobSite[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(jobSites)
+    .where(eq(jobSites.status, "active"));
+}
+
+export async function getJobSiteById(id: number): Promise<JobSite | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(jobSites)
+    .where(eq(jobSites.id, id))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createJobSite(data: InsertJobSite): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(jobSites).values(data);
+  return (result as any).insertId || 0;
+}
+
+export async function updateJobSite(id: number, data: Partial<InsertJobSite>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(jobSites).set(data).where(eq(jobSites.id, id));
+}
+
+// Time Logs functions
+export async function getEmployeeCurrentTimeLog(employeeId: number): Promise<TimeLog | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(timeLogs)
+    .where(and(
+      eq(timeLogs.employeeId, employeeId),
+      isNull(timeLogs.clockOutTime)
+    ))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createTimeLog(data: InsertTimeLog): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(timeLogs).values(data);
+  return (result as any).insertId || 0;
+}
+
+export async function updateTimeLog(id: number, data: Partial<InsertTimeLog>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(timeLogs).set(data).where(eq(timeLogs.id, id));
+}
+
+export async function deleteTimeLog(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(timeLogs).where(eq(timeLogs.id, id));
+}
+
+export async function getEmployeeTimeLogs(employeeId: number, limit: number = 100): Promise<TimeLog[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(timeLogs)
+    .where(eq(timeLogs.employeeId, employeeId))
+    .orderBy(desc(timeLogs.clockInTime))
+    .limit(limit);
+}
+
+export async function getTimeLogById(id: number): Promise<TimeLog | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(timeLogs)
+    .where(eq(timeLogs.id, id))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}

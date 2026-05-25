@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -25,4 +25,45 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Employees table
+export const employees = mysqlTable("employees", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  employeeId: varchar("employeeId", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 20 }),
+  role: mysqlEnum("role", ["employee", "supervisor", "admin"]).default("employee").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Job Sites table
+export const jobSites = mysqlTable("jobSites", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Time Logs table
+export const timeLogs = mysqlTable("timeLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  employeeId: int("employeeId").notNull(),
+  jobSiteId: int("jobSiteId").notNull(),
+  clockInTime: timestamp("clockInTime").notNull(),
+  clockOutTime: timestamp("clockOutTime"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = typeof employees.$inferInsert;
+export type JobSite = typeof jobSites.$inferSelect;
+export type InsertJobSite = typeof jobSites.$inferInsert;
+export type TimeLog = typeof timeLogs.$inferSelect;
+export type InsertTimeLog = typeof timeLogs.$inferInsert;

@@ -40,14 +40,9 @@ export default function LogsScreen() {
     },
   });
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, authLoading]);
+  // Auth guards are handled by the protected layout
 
-  // Redirect to profile creation if no profile
+  // Filter logs based on selected date range
   useEffect(() => {
     if (!profileQuery.isLoading && !profileQuery.data) {
       router.replace("/login");
@@ -125,7 +120,7 @@ export default function LogsScreen() {
 
   const handleEdit = (logId: number) => {
     router.push({
-      pathname: "/edit-log",
+      pathname: "/(protected)/edit-log",
       params: { logId: logId.toString() },
     });
   };

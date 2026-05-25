@@ -16,19 +16,7 @@ export default function SettingsScreen() {
     enabled: isAuthenticated && !authLoading,
   });
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, authLoading]);
-
-  // Redirect to profile creation if no profile
-  useEffect(() => {
-    if (!profileQuery.isLoading && !profileQuery.data) {
-      router.replace("/login");
-    }
-  }, [profileQuery.data, profileQuery.isLoading]);
+  // Auth guards are handled by the protected layout
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -42,7 +30,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await logout();
-            router.replace("/login");
+            // Protected layout will redirect to login automatically
           } catch (error) {
             Alert.alert("Error", error instanceof Error ? error.message : "Failed to logout");
           }

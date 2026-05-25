@@ -45,19 +45,7 @@ export default function HomeScreen() {
     },
   });
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, authLoading]);
-
-  // Redirect to profile creation if no profile
-  useEffect(() => {
-    if (!profileQuery.isLoading && !profileQuery.data) {
-      router.replace("/login");
-    }
-  }, [profileQuery.data, profileQuery.isLoading]);
+  // Auth guards are handled by the protected layout, so we don't need to redirect here
 
   // Calculate elapsed time
   useEffect(() => {
@@ -238,7 +226,7 @@ export default function HomeScreen() {
           {/* Quick Links */}
           <View className="gap-3">
             <TouchableOpacity
-              onPress={() => router.push("/(tabs)/logs")}
+              onPress={() => router.push("/(protected)/(tabs)/logs")}
               className="bg-surface rounded-lg p-4 border border-border"
             >
               <Text className="text-base font-semibold text-foreground">View Time Logs</Text>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { ScreenContainer } from "@/components/screen-container";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
@@ -25,17 +26,19 @@ export default function LoginScreen() {
   // If user is authenticated and has a profile, redirect to home
   useEffect(() => {
     if (isAuthenticated && !authLoading && getProfileQuery.data) {
-      router.replace("/(tabs)");
+      router.replace("/(protected)/(tabs)");
     }
   }, [isAuthenticated, authLoading, getProfileQuery.data]);
 
   const handleLogin = async () => {
     try {
       setLoading(true);
+      // Use the app's configured redirect URL for OAuth callback
+      const redirectUrl = Linking.createURL("oauth/callback");
       // Open the OAuth login page
       const result = await WebBrowser.openAuthSessionAsync(
-        `https://auth.manus.im/login`,
-        "exp://"
+        `https://auth.manus.im/login?redirect_uri=${encodeURIComponent(redirectUrl)}`,
+        redirectUrl
       );
 
       if (result.type === "success") {
@@ -65,7 +68,7 @@ export default function LoginScreen() {
       });
 
       Alert.alert("Success", "Profile created successfully!");
-      router.replace("/(tabs)");
+      router.replace("/(protected)/(tabs)");
     } catch (error) {
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to create profile");
     } finally {

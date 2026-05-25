@@ -18,7 +18,6 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
-import { useAuth } from "@/hooks/use-auth";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -28,7 +27,6 @@ export const unstable_settings = {
 };
 
 function RootLayoutContent() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
@@ -84,18 +82,10 @@ function RootLayoutContent() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
-          {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
-          {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
+          {/* Always render the same Stack structure to avoid navigator tree remounting */}
           <Stack screenOptions={{ headerShown: false }}>
-            {!isAuthenticated && !authLoading ? (
-              <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
-            ) : (
-              <>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="edit-log" />
-              </>
-            )}
+            <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
+            <Stack.Screen name="(protected)" />
             <Stack.Screen name="oauth/callback" />
           </Stack>
           <StatusBar style="auto" />

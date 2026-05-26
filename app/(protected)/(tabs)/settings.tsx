@@ -1,145 +1,95 @@
-import { useEffect } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useRouter } from "expo-router";
-import { ScreenContainer } from "@/components/screen-container";
-import { useAuth } from "@/hooks/use-auth";
-import { useColors } from "@/hooks/use-colors";
-import { trpc } from "@/lib/trpc";
+import { ScrollView, Text, View, TouchableOpacity, Alert } from 'react-native';
+import { router } from 'expo-router';
+import { ScreenContainer } from '@/components/screen-container';
+import { useLocalAuth } from '@/hooks/use-local-auth';
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
-  const colors = useColors();
-
-  // Queries
-  const profileQuery = trpc.employee.getProfile.useQuery(undefined, {
-    enabled: isAuthenticated && !authLoading,
-  });
-
-  // Auth guards are handled by the protected layout
+  const { employee, logout } = useLocalAuth();
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
       {
-        text: "Cancel",
-        onPress: () => {},
-        style: "cancel",
+        text: 'Cancel',
+        style: 'cancel',
       },
       {
-        text: "Logout",
+        text: 'Logout',
         onPress: async () => {
           try {
             await logout();
-            // Protected layout will redirect to login automatically
+            router.replace('/login');
           } catch (error) {
-            Alert.alert("Error", error instanceof Error ? error.message : "Failed to logout");
+            Alert.alert('Error', 'Failed to logout');
           }
         },
-        style: "destructive",
+        style: 'destructive',
       },
     ]);
   };
 
-  if (authLoading || profileQuery.isLoading) {
-    return (
-      <ScreenContainer className="items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
-      </ScreenContainer>
-    );
-  }
-
   return (
     <ScreenContainer className="p-4">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-6 pb-8">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className="gap-6 pb-6">
           {/* Header */}
-          <View className="gap-2">
+          <View>
             <Text className="text-3xl font-bold text-foreground">Settings</Text>
-            <Text className="text-sm text-muted">Manage your account and preferences</Text>
+            <Text className="text-sm text-muted mt-1">Manage your account</Text>
           </View>
 
-          {/* Employee Information */}
-          <View className="gap-3">
+          {/* Employee Info */}
+          <View className="bg-surface rounded-2xl p-6 border border-border gap-4">
             <Text className="text-lg font-semibold text-foreground">Employee Information</Text>
 
-            <View className="bg-surface rounded-lg p-4 border border-border gap-4">
-              <View className="gap-1">
-                <Text className="text-xs text-muted">Employee ID</Text>
-                <Text className="text-base font-semibold text-foreground">
-                  {profileQuery.data?.employeeId}
-                </Text>
+            <View className="gap-3">
+              <View>
+                <Text className="text-xs text-muted font-semibold mb-1">NAME</Text>
+                <Text className="text-base font-semibold text-foreground">{employee?.name}</Text>
               </View>
 
-              <View className="gap-1">
-                <Text className="text-xs text-muted">Full Name</Text>
-                <Text className="text-base font-semibold text-foreground">
-                  {profileQuery.data?.name}
-                </Text>
-              </View>
-
-              {profileQuery.data?.email && (
-                <View className="gap-1">
-                  <Text className="text-xs text-muted">Email</Text>
-                  <Text className="text-base font-semibold text-foreground">
-                    {profileQuery.data.email}
-                  </Text>
-                </View>
-              )}
-
-              {profileQuery.data?.phone && (
-                <View className="gap-1">
-                  <Text className="text-xs text-muted">Phone</Text>
-                  <Text className="text-base font-semibold text-foreground">
-                    {profileQuery.data.phone}
-                  </Text>
-                </View>
-              )}
-
-              <View className="gap-1">
-                <Text className="text-xs text-muted">Role</Text>
-                <Text className="text-base font-semibold text-foreground capitalize">
-                  {profileQuery.data?.role}
-                </Text>
+              <View>
+                <Text className="text-xs text-muted font-semibold mb-1">EMPLOYEE ID</Text>
+                <Text className="text-base font-semibold text-foreground">{employee?.id}</Text>
               </View>
             </View>
           </View>
 
-          {/* Account Information */}
-          <View className="gap-3">
-            <Text className="text-lg font-semibold text-foreground">Account</Text>
-
-            <View className="bg-surface rounded-lg p-4 border border-border gap-2">
-              <Text className="text-xs text-muted">Manus Account</Text>
-              <Text className="text-base font-semibold text-foreground">{user?.email || user?.name}</Text>
-            </View>
-          </View>
-
-          {/* App Information */}
-          <View className="gap-3">
+          {/* App Info */}
+          <View className="bg-surface rounded-2xl p-6 border border-border gap-4">
             <Text className="text-lg font-semibold text-foreground">App Information</Text>
 
-            <View className="bg-surface rounded-lg p-4 border border-border gap-4">
-              <View className="flex-row justify-between items-center">
+            <View className="gap-3">
+              <View className="flex-row justify-between">
                 <Text className="text-sm text-muted">Version</Text>
                 <Text className="text-sm font-semibold text-foreground">1.0.0</Text>
               </View>
 
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm text-muted">Company</Text>
-                <Text className="text-sm font-semibold text-foreground">Mosher Lawns</Text>
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-muted">Storage</Text>
+                <Text className="text-sm font-semibold text-foreground">Local Only</Text>
+              </View>
+
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-muted">Internet Required</Text>
+                <Text className="text-sm font-semibold text-foreground">No</Text>
               </View>
             </View>
+          </View>
+
+          {/* About */}
+          <View className="bg-background rounded-lg p-4 border border-border">
+            <Text className="text-xs text-muted font-semibold mb-2">ABOUT</Text>
+            <Text className="text-sm text-muted leading-relaxed">
+              Mosher Lawns Time Tracker is a simple, offline-first app for tracking employee time on job sites. All data is stored locally on your device.
+            </Text>
           </View>
 
           {/* Logout Button */}
           <TouchableOpacity
             onPress={handleLogout}
-            className="py-3 px-6 rounded-lg items-center"
-            style={{
-              backgroundColor: colors.error,
-            }}
+            className="bg-error rounded-lg py-3 mt-4"
           >
-            <Text className="text-base font-semibold text-background">Logout</Text>
+            <Text className="text-center text-white font-semibold">Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

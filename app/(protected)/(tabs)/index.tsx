@@ -1,237 +1,200 @@
-import { useEffect, useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Alert, FlatList } from "react-native";
-import { useRouter } from "expo-router";
-import { ScreenContainer } from "@/components/screen-container";
-import { useAuth } from "@/hooks/use-auth";
-import { useColors } from "@/hooks/use-colors";
-import { trpc } from "@/lib/trpc";
+import { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, FlatList } from 'react-native';
+import { ScreenContainer } from '@/components/screen-container';
+import { useLocalAuth } from '@/hooks/use-local-auth';
+import { getJobSites, getActiveTimeLog, addTimeLog, updateTimeLog, TimeLog, JobSite } from '@/lib/local-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { router } from 'expo-router';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const colors = useColors();
-  const [elapsedTime, setElapsedTime] = useState("00:00:00");
+  const { employee } = useLocalAuth();
+  const [jobSites, setJobSites] = useState<JobSite[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string | null>(null);
+  const [activeLog, setActiveLog] = useState<TimeLog | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  // Queries
-  const profileQuery = trpc.employee.getProfile.useQuery(undefined, {
-    enabled: isAuthenticated && !authLoading,
-  });
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+      const interval = setInterval(() => {
+        if (activeLog && !activeLog.clockOutTime) {
+          setElapsedTime(Math.floor((Date.now() - activeLog.clockInTime) / 1000));
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [activeLog])
+  );
 
-  const currentLogQuery = trpc.timeLogs.getCurrentLog.useQuery(undefined, {
-    enabled: isAuthenticated && !authLoading,
-    refetchInterval: 1000, // Refresh every second for elapsed time
-  });
+  const loadData = async () => {
+    if (!employee) return;
+    try {
+      const sites = await getJobSites();
+      setJobSites(sites);
 
-  const jobSitesQuery = trpc.jobSites.list.useQuery(undefined, {
-    enabled: isAuthenticated && !authLoading,
-  });
+      const active = await getActiveTimeLog(employee.id);
+      setActiveLog(active);
 
-  // Mutations
-  const clockInMutation = trpc.timeLogs.clockIn.useMutation({
-    onSuccess: () => {
-      currentLogQuery.refetch();
-    },
-    onError: (error) => {
-      Alert.alert("Error", error.message);
-    },
-  });
+      if (active) {
+        setElapsedTime(Math.floor((Date.now() - active.clockInTime) / 1000));
+      } else {
+        setElapsedTime(0);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
 
-  const clockOutMutation = trpc.timeLogs.clockOut.useMutation({
-    onSuccess: () => {
-      currentLogQuery.refetch();
-    },
-    onError: (error) => {
-      Alert.alert("Error", error.message);
-    },
-  });
-
-  // Auth guards are handled by the protected layout, so we don't need to redirect here
-
-  // Calculate elapsed time
-  useEffect(() => {
-    if (!currentLogQuery.data) {
-      setElapsedTime("00:00:00");
+  const handleClockIn = async () => {
+    if (!selectedSite) {
+      Alert.alert('Error', 'Please select a job site');
       return;
     }
 
-    const updateElapsedTime = () => {
-      if (!currentLogQuery.data) return;
-      const now = new Date().getTime();
-      const clockInTime = new Date(currentLogQuery.data.clockInTime).getTime();
-      const elapsed = Math.floor((now - clockInTime) / 1000);
+    if (!employee) return;
 
-      const hours = Math.floor(elapsed / 3600);
-      const minutes = Math.floor((elapsed % 3600) / 60);
-      const seconds = elapsed % 60;
+    setLoading(true);
+    try {
+      const newLog: TimeLog = {
+        id: Date.now().toString(),
+        employeeId: employee.id,
+        jobSiteId: selectedSite,
+        clockInTime: Date.now(),
+        clockOutTime: null,
+      };
 
-      setElapsedTime(
-        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-      );
-    };
-
-    updateElapsedTime();
-    const interval = setInterval(updateElapsedTime, 1000);
-    return () => clearInterval(interval);
-  }, [currentLogQuery.data]);
-
-  const handleClockIn = () => {
-    if (!jobSitesQuery.data || jobSitesQuery.data.length === 0) {
-      Alert.alert("Error", "No job sites available");
-      return;
+      await addTimeLog(newLog);
+      setActiveLog(newLog);
+      setElapsedTime(0);
+      Alert.alert('Success', 'Clocked in successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to clock in');
+    } finally {
+      setLoading(false);
     }
-
-    // Show job site selection
-    const options = jobSitesQuery.data.map((site) => ({
-      text: site.name,
-      onPress: () => {
-        clockInMutation.mutate({
-          jobSiteId: site.id,
-        });
-      },
-    }));
-
-    Alert.alert("Select Job Site", "Choose the job site you're clocking into:", [
-      ...options,
-      { text: "Cancel", onPress: () => {}, style: "cancel" },
-    ]);
   };
 
-  const handleClockOut = () => {
-    Alert.alert("Clock Out", "Are you sure you want to clock out?", [
-      {
-        text: "Cancel",
-        onPress: () => {},
-        style: "cancel",
-      },
-      {
-        text: "Clock Out",
-        onPress: () => {
-          clockOutMutation.mutate({});
-        },
-        style: "destructive",
-      },
-    ]);
+  const handleClockOut = async () => {
+    if (!activeLog) return;
+
+    setLoading(true);
+    try {
+      await updateTimeLog(activeLog.id, { clockOutTime: Date.now() });
+      setActiveLog(null);
+      setElapsedTime(0);
+      Alert.alert('Success', 'Clocked out successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to clock out');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (authLoading || profileQuery.isLoading || jobSitesQuery.isLoading) {
-    return (
-      <ScreenContainer className="items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
-      </ScreenContainer>
-    );
-  }
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
-  const isClockedIn = !!currentLogQuery.data;
-  const currentJobSite = isClockedIn
-    ? jobSitesQuery.data?.find((site) => site.id === currentLogQuery.data?.jobSiteId)
-    : null;
+  const getActiveSiteName = () => {
+    if (!activeLog) return '';
+    const site = jobSites.find(s => s.id === activeLog.jobSiteId);
+    return site?.name || 'Unknown Site';
+  };
 
   return (
     <ScreenContainer className="p-4">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View className="gap-6 pb-8">
-          {/* Header */}
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">
-              Welcome, {profileQuery.data?.name}
-            </Text>
-            <Text className="text-sm text-muted">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              })}
-            </Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className="gap-6 pb-6">
+          {/* Welcome */}
+          <View>
+            <Text className="text-3xl font-bold text-foreground">Welcome</Text>
+            <Text className="text-base text-muted">{employee?.name}</Text>
           </View>
 
-          {/* Status Card */}
-            {isClockedIn && currentLogQuery.data ? (
-              <View
-                className="rounded-2xl p-6 border"
-                style={{
-                  backgroundColor: colors.success,
-                  borderColor: colors.success,
-                }}
-              >
-                <Text className="text-sm font-semibold text-muted mb-2">Current Status</Text>
-                <Text className="text-4xl font-bold text-foreground mb-4">Clocked In</Text>
-
-                <View className="gap-2 mb-4">
-                  <View className="flex-row justify-between">
-                    <Text className="text-sm text-muted">Job Site:</Text>
-                    <Text className="text-sm font-semibold text-foreground">{currentJobSite?.name}</Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-sm text-muted">Elapsed Time:</Text>
-                    <Text className="text-sm font-semibold text-foreground">{elapsedTime}</Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-sm text-muted">Clocked In:</Text>
-                    <Text className="text-sm font-semibold text-foreground">
-                      {new Date(currentLogQuery.data.clockInTime).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </Text>
-                  </View>
+          {/* Clock Status Card */}
+          <View className="bg-surface rounded-2xl p-6 border border-border gap-4">
+            {activeLog ? (
+              <>
+                <View>
+                  <Text className="text-sm text-muted mb-2">Currently Clocked In</Text>
+                  <Text className="text-2xl font-bold text-primary">{getActiveSiteName()}</Text>
                 </View>
-              </View>
-            ) : (
-              <View
-                className="rounded-2xl p-6 border"
-                style={{
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text className="text-sm font-semibold text-muted mb-2">Current Status</Text>
-                <Text className="text-4xl font-bold text-foreground mb-4">Clocked Out</Text>
-              </View>
-            )}
 
-          {/* Main Action Button */}
-          <TouchableOpacity
-            onPress={isClockedIn ? handleClockOut : handleClockIn}
-            disabled={clockInMutation.isPending || clockOutMutation.isPending}
-            style={{
-              backgroundColor: isClockedIn ? colors.error : colors.success,
-              opacity: clockInMutation.isPending || clockOutMutation.isPending ? 0.7 : 1,
-            }}
-            className="py-6 px-6 rounded-2xl items-center"
-          >
-            {clockInMutation.isPending || clockOutMutation.isPending ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text className="text-2xl font-bold text-background">
-                {isClockedIn ? "Clock Out" : "Clock In"}
-              </Text>
-            )}
-          </TouchableOpacity>
+                <View className="bg-background rounded-lg p-4 items-center">
+                  <Text className="text-5xl font-bold text-primary font-mono">{formatTime(elapsedTime)}</Text>
+                  <Text className="text-sm text-muted mt-2">Elapsed Time</Text>
+                </View>
 
-          {/* Quick Stats */}
-          <View className="gap-3">
-            <Text className="text-lg font-semibold text-foreground">Today's Summary</Text>
-            <View className="flex-row gap-3">
-              <View className="flex-1 bg-surface rounded-lg p-4 border border-border">
-                <Text className="text-xs text-muted mb-1">Total Hours</Text>
-                <Text className="text-2xl font-bold text-foreground">0h 00m</Text>
-              </View>
-              <View className="flex-1 bg-surface rounded-lg p-4 border border-border">
-                <Text className="text-xs text-muted mb-1">Sites Visited</Text>
-                <Text className="text-2xl font-bold text-foreground">0</Text>
-              </View>
-            </View>
+                <TouchableOpacity
+                  onPress={handleClockOut}
+                  disabled={loading}
+                  className="bg-error rounded-lg py-3"
+                  style={{ opacity: loading ? 0.6 : 1 }}
+                >
+                  <Text className="text-center text-white font-semibold">Clock Out</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text className="text-lg font-semibold text-foreground">Clock In</Text>
+                <Text className="text-sm text-muted mb-2">Select a job site:</Text>
+
+                <FlatList
+                  data={jobSites}
+                  keyExtractor={item => item.id}
+                  scrollEnabled={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => setSelectedSite(item.id)}
+                      className={`p-3 rounded-lg mb-2 border ${
+                        selectedSite === item.id
+                          ? 'bg-primary border-primary'
+                          : 'bg-background border-border'
+                      }`}
+                    >
+                      <Text
+                        className={`font-semibold ${
+                          selectedSite === item.id ? 'text-white' : 'text-foreground'
+                        }`}
+                      >
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+
+                <TouchableOpacity
+                  onPress={handleClockIn}
+                  disabled={loading || !selectedSite}
+                  className="bg-primary rounded-lg py-3 mt-2"
+                  style={{ opacity: loading || !selectedSite ? 0.6 : 1 }}
+                >
+                  <Text className="text-center text-white font-semibold">Clock In</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Quick Links */}
           <View className="gap-3">
             <TouchableOpacity
-              onPress={() => router.push("/(protected)/(tabs)/logs")}
+              onPress={() => router.push('/(protected)/(tabs)/logs')}
               className="bg-surface rounded-lg p-4 border border-border"
             >
               <Text className="text-base font-semibold text-foreground">View Time Logs</Text>
               <Text className="text-xs text-muted mt-1">See all your time entries</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Info Card */}
+          <View className="bg-background rounded-lg p-4 border border-border">
+            <Text className="text-xs text-muted font-semibold mb-2">TIP</Text>
+            <Text className="text-sm text-muted">
+              All your time tracking data is stored locally on your phone. No internet connection required.
+            </Text>
           </View>
         </View>
       </ScrollView>

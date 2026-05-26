@@ -1,16 +1,16 @@
-import { Redirect, Stack } from "expo-router";
-import { useAuth } from "@/hooks/use-auth";
-import { ActivityIndicator, View } from "react-native";
-import { useColors } from "@/hooks/use-colors";
+import { Redirect, Stack } from 'expo-router';
+import { useLocalAuth } from '@/hooks/use-local-auth';
+import { ActivityIndicator, View } from 'react-native';
+import { useColors } from '@/hooks/use-colors';
 
 export default function ProtectedLayout() {
   // All hooks must be called before any conditional returns
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading } = useLocalAuth();
   const colors = useColors();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );

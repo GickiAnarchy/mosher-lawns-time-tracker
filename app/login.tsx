@@ -1,96 +1,148 @@
-import { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from "react-native";
-import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
-import { ScreenContainer } from "@/components/screen-container";
-import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
-import { useColors } from "@/hooks/use-colors";
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScreenContainer } from '@/components/screen-container';
+import { useLocalAuth } from '@/hooks/use-local-auth';
+import { router } from 'expo-router';
+import { initializeDefaultData } from '@/lib/local-storage';
 
 export default function LoginScreen() {
-  // All hooks must be called before any conditional returns
-  const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading, refresh } = useAuth();
-  const colors = useColors();
-  const [employeeId, setEmployeeId] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const { login, loading: authLoading } = useLocalAuth();
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpPin, setSignUpPin] = useState('');
+  const [initialized, setInitialized] = useState(false);
 
-  const createProfileMutation = trpc.employee.createProfile.useMutation();
-  const getProfileQuery = trpc.employee.getProfile.useQuery(undefined, {
-    enabled: isAuthenticated && !authLoading,
-  });
-
-  // If user is authenticated and has a profile, redirect to home
   useEffect(() => {
-    if (isAuthenticated && !authLoading && getProfileQuery.data) {
-      router.replace("/(protected)/(tabs)");
-    }
-  }, [isAuthenticated, authLoading, getProfileQuery.data, router]);
+    // Initialize default data on first load
+    initializeDefaultData().then(() => setInitialized(true));
+  }, []);
 
   const handleLogin = async () => {
-    try {
-      setLoading(true);
-      // Use the app's configured redirect URL for OAuth callback
-      const redirectUrl = Linking.createURL("oauth/callback");
-      // Open the OAuth login page
-      const result = await WebBrowser.openAuthSessionAsync(
-        `https://auth.manus.im/login?redirect_uri=${encodeURIComponent(redirectUrl)}`,
-        redirectUrl
-      );
-
-      if (result.type === "success") {
-        // Refresh auth state after successful login
-        await refresh();
-      }
-    } catch (error) {
-      Alert.alert("Login Error", error instanceof Error ? error.message : "Failed to login");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegisterProfile = async () => {
-    if (!employeeId.trim() || !name.trim()) {
-      Alert.alert("Validation Error", "Employee ID and Name are required");
+    if (!pin.trim()) {
+      Alert.alert('Error', 'Please enter your PIN');
       return;
     }
 
+    setLoading(true);
+    const success = await login(pin);
+    setLoading(false);
+
+    if (success) {
+      router.replace('/(protected)/(tabs)');
+    } else {
+      Alert.alert('Login Failed', 'Invalid PIN. Please try again.');
+      setPin('');
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!signUpName.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+    if (!signUpPin.trim() || signUpPin.length < 4) {
+      Alert.alert('Error', 'PIN must be at least 4 digits');
+      return;
+    }
+
+    // Import here to avoid circular dependency
+    const { addEmployee, setCurrentEmployee } = await import('@/lib/local-storage');
+    
+    const newEmployee = {
+      id: Date.now().toString(),
+      name: signUpName,
+      pin: signUpPin,
+    };
+
     try {
       setLoading(true);
-      await createProfileMutation.mutateAsync({
-        employeeId: employeeId.trim(),
-        name: name.trim(),
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-      });
-
-      Alert.alert("Success", "Profile created successfully!");
-      router.replace("/(protected)/(tabs)");
+      await addEmployee(newEmployee);
+      await setCurrentEmployee(newEmployee);
+      router.replace('/(protected)/(tabs)');
     } catch (error) {
-      Alert.alert("Error", error instanceof Error ? error.message : "Failed to create profile");
+      Alert.alert('Error', 'Failed to create account');
     } finally {
       setLoading(false);
     }
   };
 
-  // Now we can have conditional returns after all hooks are called
-  if (authLoading) {
+  if (!initialized || authLoading) {
     return (
       <ScreenContainer className="items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Text className="text-muted">Loading...</Text>
       </ScreenContainer>
     );
   }
 
-  if (!isAuthenticated) {
+  if (showSignUp) {
     return (
       <ScreenContainer className="p-6">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <View className="flex-1 justify-center gap-8">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+            <View className="flex-1 justify-center gap-6">
+              {/* Header */}
+              <View className="items-center gap-2">
+                <Text className="text-4xl font-bold text-foreground">Create Account</Text>
+                <Text className="text-base text-muted text-center">Set up your employee account</Text>
+              </View>
+
+              {/* Form */}
+              <View className="gap-4">
+                <View>
+                  <Text className="text-sm font-semibold text-foreground mb-2">Full Name</Text>
+                  <TextInput
+                    placeholder="Enter your name"
+                    value={signUpName}
+                    onChangeText={setSignUpName}
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                  />
+                </View>
+
+                <View>
+                  <Text className="text-sm font-semibold text-foreground mb-2">PIN (4+ digits)</Text>
+                  <TextInput
+                    placeholder="Enter a PIN"
+                    value={signUpPin}
+                    onChangeText={setSignUpPin}
+                    secureTextEntry
+                    keyboardType="numeric"
+                    placeholderTextColor="#999"
+                    editable={!loading}
+                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleSignUp}
+                  disabled={loading}
+                  className="bg-primary rounded-lg py-3 mt-4"
+                  style={{ opacity: loading ? 0.6 : 1 }}
+                >
+                  <Text className="text-center text-white font-semibold text-base">
+                    {loading ? 'Creating...' : 'Create Account'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowSignUp(false)} disabled={loading}>
+                  <Text className="text-center text-primary font-semibold">Back to Login</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </ScreenContainer>
+    );
+  }
+
+  return (
+    <ScreenContainer className="p-6">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          <View className="flex-1 justify-center gap-6">
             {/* Header */}
             <View className="items-center gap-2">
               <Text className="text-4xl font-bold text-foreground">Mosher Lawns</Text>
@@ -98,126 +150,50 @@ export default function LoginScreen() {
             </View>
 
             {/* Login Card */}
-            <View className="bg-surface rounded-2xl p-6 shadow-sm border border-border gap-4">
-              <Text className="text-2xl font-bold text-foreground">Welcome</Text>
-              <Text className="text-sm text-muted">Sign in to track your time</Text>
+            <View className="bg-surface rounded-2xl p-6 border border-border gap-4">
+              <View>
+                <Text className="text-xl font-bold text-foreground mb-2">Welcome</Text>
+                <Text className="text-sm text-muted">Sign in to track your time</Text>
+              </View>
+
+              <View>
+                <Text className="text-sm font-semibold text-foreground mb-2">PIN</Text>
+                <TextInput
+                  placeholder="Enter your PIN"
+                  value={pin}
+                  onChangeText={setPin}
+                  secureTextEntry
+                  keyboardType="numeric"
+                  placeholderTextColor="#999"
+                  editable={!loading}
+                  className="bg-background border border-border rounded-lg px-4 py-3 text-foreground"
+                />
+              </View>
 
               <TouchableOpacity
                 onPress={handleLogin}
                 disabled={loading}
-                style={{
-                  backgroundColor: colors.primary,
-                  opacity: loading ? 0.7 : 1,
-                }}
-                className="py-3 px-6 rounded-lg items-center"
+                className="bg-primary rounded-lg py-3 mt-2"
+                style={{ opacity: loading ? 0.6 : 1 }}
               >
-                {loading ? (
-                  <ActivityIndicator color={colors.background} />
-                ) : (
-                  <Text className="text-background font-semibold">Sign In</Text>
-                )}
+                <Text className="text-center text-white font-semibold text-base">
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setShowSignUp(true)} disabled={loading}>
+                <Text className="text-center text-primary font-semibold">Create New Account</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Demo Info */}
+            <View className="bg-background rounded-lg p-4 border border-border">
+              <Text className="text-xs text-muted font-semibold mb-2">DEMO ACCOUNT</Text>
+              <Text className="text-sm text-muted">PIN: 1234</Text>
             </View>
           </View>
         </ScrollView>
-      </ScreenContainer>
-    );
-  }
-
-  // Show profile registration if user is authenticated but has no profile
-  if (isAuthenticated && !getProfileQuery.data && !getProfileQuery.isLoading) {
-    return (
-      <ScreenContainer className="p-6">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <View className="flex-1 justify-center gap-6">
-            {/* Header */}
-            <View className="items-center gap-2">
-              <Text className="text-3xl font-bold text-foreground">Create Profile</Text>
-              <Text className="text-sm text-muted">Complete your employee information</Text>
-            </View>
-
-            {/* Form Card */}
-            <View className="bg-surface rounded-2xl p-6 shadow-sm border border-border gap-4">
-              {/* Employee ID */}
-              <View className="gap-2">
-                <Text className="text-sm font-semibold text-foreground">Employee ID *</Text>
-                <TextInput
-                  placeholder="e.g., EMP001"
-                  value={employeeId}
-                  onChangeText={setEmployeeId}
-                  editable={!loading}
-                  className="border border-border rounded-lg px-4 py-3 text-foreground"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              {/* Name */}
-              <View className="gap-2">
-                <Text className="text-sm font-semibold text-foreground">Full Name *</Text>
-                <TextInput
-                  placeholder="Your name"
-                  value={name}
-                  onChangeText={setName}
-                  editable={!loading}
-                  className="border border-border rounded-lg px-4 py-3 text-foreground"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              {/* Email */}
-              <View className="gap-2">
-                <Text className="text-sm font-semibold text-foreground">Email (Optional)</Text>
-                <TextInput
-                  placeholder="your@email.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  editable={!loading}
-                  keyboardType="email-address"
-                  className="border border-border rounded-lg px-4 py-3 text-foreground"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              {/* Phone */}
-              <View className="gap-2">
-                <Text className="text-sm font-semibold text-foreground">Phone (Optional)</Text>
-                <TextInput
-                  placeholder="(555) 123-4567"
-                  value={phone}
-                  onChangeText={setPhone}
-                  editable={!loading}
-                  keyboardType="phone-pad"
-                  className="border border-border rounded-lg px-4 py-3 text-foreground"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                onPress={handleRegisterProfile}
-                disabled={loading}
-                style={{
-                  backgroundColor: colors.primary,
-                  opacity: loading ? 0.7 : 1,
-                }}
-                className="py-3 px-6 rounded-lg items-center mt-2"
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.background} />
-                ) : (
-                  <Text className="text-background font-semibold">Create Profile</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      </ScreenContainer>
-    );
-  }
-
-  return (
-    <ScreenContainer className="items-center justify-center">
-      <ActivityIndicator size="large" color={colors.primary} />
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

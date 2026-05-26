@@ -13,11 +13,12 @@
 
 ## Data Management
 
-- [x] Cloud database integration (PostgreSQL via server)
-- [x] Database schema (employees, job sites, time logs)
-- [x] tRPC API routes for all operations
-- [ ] Offline support (queue actions when offline)
-- [ ] Data persistence and recovery
+- [ ] Replace OAuth with local PIN authentication
+- [ ] AsyncStorage for employee data
+- [ ] AsyncStorage for job sites data
+- [ ] AsyncStorage for time logs data
+- [ ] Remove backend/tRPC dependencies
+- [ ] Full offline support (no internet needed)
 
 ## UI/UX
 
@@ -37,9 +38,10 @@
 
 ## Testing & Polish
 
+- [ ] Test local authentication flow
 - [ ] Test clock in/out flow end-to-end
 - [ ] Test edit/delete operations
-- [ ] Test data sync functionality
+- [ ] Test data persistence after app restart
 - [ ] Verify all buttons and links work
 - [ ] Test on Android device/emulator
 - [ ] Performance optimization

@@ -1,40 +1,43 @@
-# Mosher Lawns Time Management & Record Keeping - Project TODO
+# Mosher Lawns Time Tracker - App Overhaul (Bare Minimum, Shared Device)
 
-## App Redesign (Company-Wide System)
+## Phase 1: Remove Login & Simplify
+- [ ] Remove login screen completely
+- [ ] Remove role-based auth system
+- [ ] Simplify local storage for shared device access
+- [ ] Update root layout to skip authentication
 
-### Phase 1: Core Architecture
-- [ ] Redesign as company-wide time management system (not individual tracker)
-- [ ] Create supervisor/admin login flow
-- [ ] Setup role-based access (Supervisor vs Employee)
-- [ ] Implement employee management (CRUD)
-- [ ] Implement job site management (CRUD)
+## Phase 2: Bare-Minimum UI Screens
+- [ ] Create home screen with minimal design
+- [ ] Create clock in/out screen (minimal, essential controls only)
+- [ ] Create time logs view (minimal)
+- [ ] Create data management screen
+- [ ] Remove all unnecessary UI elements and decorations
 
-### Phase 2: Employee Clock In/Out
-- [ ] Employee login screen
-- [ ] Clock in/out interface with job site selection
-- [ ] Active time log display
-- [ ] Time log history for individual employee
+## Phase 3: Employee Management (CRUD)
+- [ ] Add employee functionality
+- [ ] Delete employee functionality
+- [ ] Edit employee functionality
+- [ ] Save/load employees from AsyncStorage
+- [ ] Persist employee data reliably
 
-### Phase 3: Supervisor Dashboard
-- [ ] View all employees
-- [ ] View all active time logs
-- [ ] View all job sites
-- [ ] See employee time logs by date range
-- [ ] Edit/delete time entries
+## Phase 4: Job Management (CRUD)
+- [ ] Add job functionality
+- [ ] Delete job functionality
+- [ ] Edit job functionality
+- [ ] Save/load jobs from AsyncStorage
+- [ ] Persist job data reliably
 
-### Phase 4: Reporting & Export
-- [ ] Generate daily time reports
-- [ ] Generate employee summaries
-- [ ] Generate job site summaries
-- [ ] Export to CSV functionality
+## Phase 5: Data Management Screen
+- [ ] Create employees list view with edit/delete buttons
+- [ ] Create jobs list view with edit/delete buttons
+- [ ] Implement inline editing for employee details
+- [ ] Implement inline editing for job details
+- [ ] Add save all changes button
+- [ ] Add confirmation dialogs for deletions
 
-### Phase 5: Polish & Testing
-- [ ] Test all workflows end-to-end
-- [ ] Fix styling and UI issues
-- [ ] Test on Android device
-- [ ] Performance optimization
-
-## Known Issues (Being Fixed)
-- [x] Job sites not loading in individual version
-- [x] Clock in button not clickable
-- [ ] Redesign to company system will resolve these issues
+## Phase 6: Testing & Finalization
+- [ ] Test all CRUD operations (employees and jobs)
+- [ ] Test data persistence across app restarts
+- [ ] Test clock in/out with available jobs and employees
+- [ ] Verify minimal UI is clean and functional
+- [ ] Save checkpoint and generate APK

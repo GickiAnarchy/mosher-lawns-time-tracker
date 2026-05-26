@@ -4,12 +4,23 @@ import { ThemeProvider } from '@/lib/theme-provider';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import { initializeDefaultData } from '@/lib/local-storage';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    async function prepare() {
+      try {
+        await initializeDefaultData();
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        SplashScreen.hideAsync();
+      }
+    }
+
+    prepare();
   }, []);
 
   return (
@@ -21,9 +32,8 @@ export default function RootLayout() {
               headerShown: false,
             }}
           >
-            <Stack.Screen name="login" />
-            <Stack.Screen name="dashboard" />
-            <Stack.Screen name="(employee)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="data-management" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

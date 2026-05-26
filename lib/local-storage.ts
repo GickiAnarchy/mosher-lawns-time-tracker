@@ -3,8 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface Employee {
   id: string;
   name: string;
-  pin: string;
-  role: 'supervisor' | 'employee';
 }
 
 export interface JobSite {
@@ -24,7 +22,6 @@ const STORAGE_KEYS = {
   EMPLOYEES: 'employees',
   JOB_SITES: 'job_sites',
   TIME_LOGS: 'time_logs',
-  CURRENT_EMPLOYEE: 'current_employee',
 };
 
 // ============ EMPLOYEE MANAGEMENT ============
@@ -39,29 +36,33 @@ export async function getEmployees(): Promise<Employee[]> {
   }
 }
 
-export async function addEmployee(employee: Employee): Promise<void> {
+export async function addEmployee(name: string): Promise<Employee> {
   try {
     const employees = await getEmployees();
-    const exists = employees.find(e => e.id === employee.id);
-    if (!exists) {
-      employees.push(employee);
-      await AsyncStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-    }
+    const newEmployee: Employee = {
+      id: Date.now().toString(),
+      name,
+    };
+    employees.push(newEmployee);
+    await AsyncStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+    return newEmployee;
   } catch (error) {
     console.error('Error adding employee:', error);
+    throw error;
   }
 }
 
-export async function updateEmployee(employee: Employee): Promise<void> {
+export async function updateEmployee(id: string, name: string): Promise<void> {
   try {
     const employees = await getEmployees();
-    const index = employees.findIndex(e => e.id === employee.id);
+    const index = employees.findIndex(e => e.id === id);
     if (index !== -1) {
-      employees[index] = employee;
+      employees[index].name = name;
       await AsyncStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
     }
   } catch (error) {
     console.error('Error updating employee:', error);
+    throw error;
   }
 }
 
@@ -75,37 +76,7 @@ export async function deleteEmployee(employeeId: string): Promise<void> {
   }
 }
 
-export async function getEmployeeByPin(pin: string): Promise<Employee | null> {
-  try {
-    const employees = await getEmployees();
-    return employees.find(e => e.pin === pin) || null;
-  } catch (error) {
-    console.error('Error getting employee by PIN:', error);
-    return null;
-  }
-}
 
-export async function getCurrentEmployee(): Promise<Employee | null> {
-  try {
-    const data = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_EMPLOYEE);
-    return data ? JSON.parse(data) : null;
-  } catch (error) {
-    console.error('Error getting current employee:', error);
-    return null;
-  }
-}
-
-export async function setCurrentEmployee(employee: Employee | null): Promise<void> {
-  try {
-    if (employee) {
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_EMPLOYEE, JSON.stringify(employee));
-    } else {
-      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_EMPLOYEE);
-    }
-  } catch (error) {
-    console.error('Error setting current employee:', error);
-  }
-}
 
 // ============ JOB SITES MANAGEMENT ============
 
@@ -119,29 +90,33 @@ export async function getJobSites(): Promise<JobSite[]> {
   }
 }
 
-export async function addJobSite(site: JobSite): Promise<void> {
+export async function addJobSite(name: string): Promise<JobSite> {
   try {
     const sites = await getJobSites();
-    const exists = sites.find(s => s.id === site.id);
-    if (!exists) {
-      sites.push(site);
-      await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
-    }
+    const newSite: JobSite = {
+      id: Date.now().toString(),
+      name,
+    };
+    sites.push(newSite);
+    await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
+    return newSite;
   } catch (error) {
     console.error('Error adding job site:', error);
+    throw error;
   }
 }
 
-export async function updateJobSite(site: JobSite): Promise<void> {
+export async function updateJobSite(id: string, name: string): Promise<void> {
   try {
     const sites = await getJobSites();
-    const index = sites.findIndex(s => s.id === site.id);
+    const index = sites.findIndex(s => s.id === id);
     if (index !== -1) {
-      sites[index] = site;
+      sites[index].name = name;
       await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
     }
   } catch (error) {
     console.error('Error updating job site:', error);
+    throw error;
   }
 }
 
@@ -167,26 +142,36 @@ export async function getTimeLogs(): Promise<TimeLog[]> {
   }
 }
 
-export async function addTimeLog(log: TimeLog): Promise<void> {
+export async function addTimeLog(employeeId: string, jobSiteId: string): Promise<TimeLog> {
   try {
     const logs = await getTimeLogs();
-    logs.push(log);
+    const newLog: TimeLog = {
+      id: Date.now().toString(),
+      employeeId,
+      jobSiteId,
+      clockInTime: Date.now(),
+      clockOutTime: null,
+    };
+    logs.push(newLog);
     await AsyncStorage.setItem(STORAGE_KEYS.TIME_LOGS, JSON.stringify(logs));
+    return newLog;
   } catch (error) {
     console.error('Error adding time log:', error);
+    throw error;
   }
 }
 
-export async function updateTimeLog(log: TimeLog): Promise<void> {
+export async function clockOutTimeLog(id: string): Promise<void> {
   try {
     const logs = await getTimeLogs();
-    const index = logs.findIndex(l => l.id === log.id);
+    const index = logs.findIndex(l => l.id === id);
     if (index !== -1) {
-      logs[index] = log;
+      logs[index].clockOutTime = Date.now();
       await AsyncStorage.setItem(STORAGE_KEYS.TIME_LOGS, JSON.stringify(logs));
     }
   } catch (error) {
-    console.error('Error updating time log:', error);
+    console.error('Error clocking out:', error);
+    throw error;
   }
 }
 
@@ -226,33 +211,16 @@ export async function initializeDefaultData(): Promise<void> {
   try {
     const employees = await getEmployees();
     if (employees.length === 0) {
-      // Add demo supervisor and employees
-      await addEmployee({
-        id: 'sup1',
-        name: 'Supervisor',
-        pin: '1111',
-        role: 'supervisor',
-      });
-      await addEmployee({
-        id: 'emp1',
-        name: 'John Doe',
-        pin: '1234',
-        role: 'employee',
-      });
-      await addEmployee({
-        id: 'emp2',
-        name: 'Jane Smith',
-        pin: '5678',
-        role: 'employee',
-      });
+      await addEmployee('John Smith');
+      await addEmployee('Jane Doe');
+      await addEmployee('Mike Johnson');
     }
 
     const sites = await getJobSites();
     if (sites.length === 0) {
-      // Add demo job sites
-      await addJobSite({ id: '1', name: 'Downtown Site' });
-      await addJobSite({ id: '2', name: 'Uptown Site' });
-      await addJobSite({ id: '3', name: 'Suburban Site' });
+      await addJobSite('Downtown Site');
+      await addJobSite('North Site');
+      await addJobSite('South Warehouse');
     }
   } catch (error) {
     console.error('Error initializing default data:', error);

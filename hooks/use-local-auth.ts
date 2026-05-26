@@ -46,6 +46,7 @@ export function useLocalAuth() {
 
   return {
     employee,
+    setEmployee,
     loading,
     isAuthenticated: !!employee,
     login,

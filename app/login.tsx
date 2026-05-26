@@ -2,17 +2,14 @@ import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useLocalAuth } from '@/hooks/use-local-auth';
+import { getEmployeeByPin, setCurrentEmployee, initializeDefaultData } from '@/lib/local-storage';
 import { router } from 'expo-router';
-import { initializeDefaultData } from '@/lib/local-storage';
 
 export default function LoginScreen() {
-  const { login, loading: authLoading } = useLocalAuth();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSignUp, setShowSignUp] = useState(false);
-  const [signUpName, setSignUpName] = useState('');
-  const [signUpPin, setSignUpPin] = useState('');
   const [initialized, setInitialized] = useState(false);
+  const { setEmployee } = useLocalAuth();
 
   useEffect(() => {
     // Initialize default data on first load
@@ -26,170 +23,141 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    const success = await login(pin);
-    setLoading(false);
-
-    if (success) {
-      router.replace('/(protected)/(tabs)');
-    } else {
-      Alert.alert('Login Failed', 'Invalid PIN. Please try again.');
-      setPin('');
-    }
-  };
-
-  const handleSignUp = async () => {
-    if (!signUpName.trim()) {
-      Alert.alert('Error', 'Please enter your name');
-      return;
-    }
-    if (!signUpPin.trim() || signUpPin.length < 4) {
-      Alert.alert('Error', 'PIN must be at least 4 digits');
-      return;
-    }
-
-    // Import here to avoid circular dependency
-    const { addEmployee, setCurrentEmployee } = await import('@/lib/local-storage');
-    
-    const newEmployee = {
-      id: Date.now().toString(),
-      name: signUpName,
-      pin: signUpPin,
-    };
-
     try {
-      setLoading(true);
-      await addEmployee(newEmployee);
-      await setCurrentEmployee(newEmployee);
-      router.replace('/(protected)/(tabs)');
+      const employee = await getEmployeeByPin(pin);
+      if (employee) {
+        await setCurrentEmployee(employee);
+        setEmployee(employee);
+
+        // Route based on role
+        if (employee.role === 'supervisor') {
+          router.replace('/dashboard');
+        } else {
+          router.replace('/(employee)');
+        }
+      } else {
+        Alert.alert('Login Failed', 'Invalid PIN. Please try again.');
+        setPin('');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to create account');
+      Alert.alert('Error', 'Login failed. Please try again.');
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!initialized || authLoading) {
+  if (!initialized) {
     return (
-      <ScreenContainer className="items-center justify-center">
-        <Text className="text-muted">Loading...</Text>
-      </ScreenContainer>
-    );
-  }
-
-  if (showSignUp) {
-    return (
-      <ScreenContainer className="p-6">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-            <View className="flex-1 justify-center gap-6">
-              {/* Header */}
-              <View className="items-center gap-2">
-                <Text className="text-4xl font-bold text-foreground">Create Account</Text>
-                <Text className="text-base text-muted text-center">Set up your employee account</Text>
-              </View>
-
-              {/* Form */}
-              <View className="gap-4">
-                <View>
-                  <Text className="text-sm font-semibold text-foreground mb-2">Full Name</Text>
-                  <TextInput
-                    placeholder="Enter your name"
-                    value={signUpName}
-                    onChangeText={setSignUpName}
-                    placeholderTextColor="#999"
-                    editable={!loading}
-                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  />
-                </View>
-
-                <View>
-                  <Text className="text-sm font-semibold text-foreground mb-2">PIN (4+ digits)</Text>
-                  <TextInput
-                    placeholder="Enter a PIN"
-                    value={signUpPin}
-                    onChangeText={setSignUpPin}
-                    secureTextEntry
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                    editable={!loading}
-                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  />
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleSignUp}
-                  disabled={loading}
-                  className="bg-primary rounded-lg py-3 mt-4"
-                  style={{ opacity: loading ? 0.6 : 1 }}
-                >
-                  <Text className="text-center text-white font-semibold text-base">
-                    {loading ? 'Creating...' : 'Create Account'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setShowSignUp(false)} disabled={loading}>
-                  <Text className="text-center text-primary font-semibold">Back to Login</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+      <ScreenContainer containerClassName="bg-background items-center justify-center">
+        <Text style={{ color: '#687076' }}>Loading...</Text>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer className="p-6">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-          <View className="flex-1 justify-center gap-6">
+    <ScreenContainer containerClassName="bg-background">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+          <View style={{ paddingHorizontal: 24, paddingVertical: 32 }}>
             {/* Header */}
-            <View className="items-center gap-2">
-              <Text className="text-4xl font-bold text-foreground">Mosher Lawns</Text>
-              <Text className="text-lg text-muted">Time Tracker</Text>
+            <View style={{ marginBottom: 40, alignItems: 'center' }}>
+              <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#11181c', marginBottom: 8 }}>
+                Mosher Lawns
+              </Text>
+              <Text style={{ fontSize: 16, color: '#687076' }}>
+                Time Management System
+              </Text>
             </View>
 
             {/* Login Card */}
-            <View className="bg-surface rounded-2xl p-6 border border-border gap-4">
-              <View>
-                <Text className="text-xl font-bold text-foreground mb-2">Welcome</Text>
-                <Text className="text-sm text-muted">Sign in to track your time</Text>
-              </View>
+            <View
+              style={{
+                backgroundColor: '#f5f5f5',
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 24,
+              }}
+            >
+              <Text style={{ fontSize: 20, fontWeight: '600', color: '#11181c', marginBottom: 8 }}>
+                Welcome
+              </Text>
+              <Text style={{ fontSize: 14, color: '#687076', marginBottom: 24 }}>
+                Sign in to your account
+              </Text>
 
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-2">PIN</Text>
+              {/* PIN Input */}
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 14, fontWeight: '500', color: '#11181c', marginBottom: 8 }}>
+                  PIN
+                </Text>
                 <TextInput
                   placeholder="Enter your PIN"
-                  value={pin}
-                  onChangeText={setPin}
+                  placeholderTextColor="#9ba1a6"
                   secureTextEntry
                   keyboardType="numeric"
-                  placeholderTextColor="#999"
+                  value={pin}
+                  onChangeText={setPin}
                   editable={!loading}
-                  className="bg-background border border-border rounded-lg px-4 py-3 text-foreground"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#e5e7eb',
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    color: '#11181c',
+                  }}
                 />
               </View>
 
+              {/* Sign In Button */}
               <TouchableOpacity
                 onPress={handleLogin}
                 disabled={loading}
-                className="bg-primary rounded-lg py-3 mt-2"
-                style={{ opacity: loading ? 0.6 : 1 }}
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: '#2d7a3a',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  opacity: loading ? 0.6 : 1,
+                }}
               >
-                <Text className="text-center text-white font-semibold text-base">
-                  {loading ? 'Signing in...' : 'Sign In'}
+                <Text style={{ color: '#ffffff', fontWeight: '600', fontSize: 16 }}>
+                  {loading ? 'Signing In...' : 'Sign In'}
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => setShowSignUp(true)} disabled={loading}>
-                <Text className="text-center text-primary font-semibold">Create New Account</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Demo Info */}
-            <View className="bg-background rounded-lg p-4 border border-border">
-              <Text className="text-xs text-muted font-semibold mb-2">DEMO ACCOUNT</Text>
-              <Text className="text-sm text-muted">PIN: 1234</Text>
+            {/* Demo Accounts */}
+            <View
+              style={{
+                backgroundColor: '#ffffff',
+                borderWidth: 1,
+                borderColor: '#e5e7eb',
+                borderRadius: 12,
+                padding: 16,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#687076', marginBottom: 12 }}>
+                DEMO ACCOUNTS
+              </Text>
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 13, color: '#11181c' }}>Supervisor:</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d7a3a' }}>PIN: 1111</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 13, color: '#11181c' }}>Employee (John):</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d7a3a' }}>PIN: 1234</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 13, color: '#11181c' }}>Employee (Jane):</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d7a3a' }}>PIN: 5678</Text>
+                </View>
+              </View>
             </View>
           </View>
         </ScrollView>

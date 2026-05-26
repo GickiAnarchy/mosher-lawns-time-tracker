@@ -1,53 +1,40 @@
-# Mosher Lawns Time Tracker - Project TODO
+# Mosher Lawns Time Management & Record Keeping - Project TODO
 
-## Core Features
+## App Redesign (Company-Wide System)
 
-- [x] Employee authentication (login with employee ID/name)
-- [x] Home/Dashboard screen with current clock status
-- [x] Job Sites screen with list of active sites
-- [x] Clock In/Out functionality with job site selection
-- [x] Time Logs screen with filtering (Today, Week, Month, All Time)
-- [x] Edit time entry functionality
-- [x] Delete time entry functionality with confirmation
-- [x] Settings screen with employee info and preferences
+### Phase 1: Core Architecture
+- [ ] Redesign as company-wide time management system (not individual tracker)
+- [ ] Create supervisor/admin login flow
+- [ ] Setup role-based access (Supervisor vs Employee)
+- [ ] Implement employee management (CRUD)
+- [ ] Implement job site management (CRUD)
 
-## Data Management
+### Phase 2: Employee Clock In/Out
+- [ ] Employee login screen
+- [ ] Clock in/out interface with job site selection
+- [ ] Active time log display
+- [ ] Time log history for individual employee
 
-- [ ] Replace OAuth with local PIN authentication
-- [ ] AsyncStorage for employee data
-- [ ] AsyncStorage for job sites data
-- [ ] AsyncStorage for time logs data
-- [ ] Remove backend/tRPC dependencies
-- [ ] Full offline support (no internet needed)
+### Phase 3: Supervisor Dashboard
+- [ ] View all employees
+- [ ] View all active time logs
+- [ ] View all job sites
+- [ ] See employee time logs by date range
+- [ ] Edit/delete time entries
 
-## UI/UX
+### Phase 4: Reporting & Export
+- [ ] Generate daily time reports
+- [ ] Generate employee summaries
+- [ ] Generate job site summaries
+- [ ] Export to CSV functionality
 
-- [x] Design system and theme configuration
-- [x] Tab navigation (Home, Logs, Settings)
-- [x] Responsive layouts for all screens
-- [x] Loading states and error handling
-- [x] Success/confirmation messages
-- [x] Dark mode support
-
-## Branding
-
-- [x] Create Mosher Lawns logo/icon
-- [x] Update app.config.ts with branding
-- [x] Set color palette (Mosher Lawns green theme)
-- [x] Configure splash screen
-
-## Testing & Polish
-
-- [ ] Test local authentication flow
-- [ ] Test clock in/out flow end-to-end
-- [ ] Test edit/delete operations
-- [ ] Test data persistence after app restart
-- [ ] Verify all buttons and links work
-- [ ] Test on Android device/emulator
+### Phase 5: Polish & Testing
+- [ ] Test all workflows end-to-end
+- [ ] Fix styling and UI issues
+- [ ] Test on Android device
 - [ ] Performance optimization
 
-## Deployment
-
-- [ ] Create checkpoint before publishing
-- [ ] Generate APK for Android
-- [ ] Setup instructions for deployment
+## Known Issues (Being Fixed)
+- [x] Job sites not loading in individual version
+- [x] Clock in button not clickable
+- [ ] Redesign to company system will resolve these issues

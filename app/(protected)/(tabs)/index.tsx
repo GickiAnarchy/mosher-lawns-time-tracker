@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, FlatList } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useLocalAuth } from '@/hooks/use-local-auth';
@@ -131,10 +131,15 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   onPress={handleClockOut}
                   disabled={loading}
-                  className="bg-error rounded-lg py-3"
-                  style={{ opacity: loading ? 0.6 : 1 }}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: '#ef4444',
+                    borderRadius: 8,
+                    paddingVertical: 12,
+                    opacity: loading ? 0.6 : 1,
+                  }}
                 >
-                  <Text className="text-center text-white font-semibold">Clock Out</Text>
+                  <Text style={{ textAlign: 'center', color: '#ffffff', fontWeight: '600' }}>Clock Out</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -149,16 +154,21 @@ export default function HomeScreen() {
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       onPress={() => setSelectedSite(item.id)}
-                      className={`p-3 rounded-lg mb-2 border ${
-                        selectedSite === item.id
-                          ? 'bg-primary border-primary'
-                          : 'bg-background border-border'
-                      }`}
+                      activeOpacity={0.7}
+                      style={{
+                        padding: 12,
+                        marginBottom: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        backgroundColor: selectedSite === item.id ? '#2d7a3a' : '#f5f5f5',
+                        borderColor: selectedSite === item.id ? '#2d7a3a' : '#e5e7eb',
+                      }}
                     >
                       <Text
-                        className={`font-semibold ${
-                          selectedSite === item.id ? 'text-white' : 'text-foreground'
-                        }`}
+                        style={{
+                          fontWeight: '600',
+                          color: selectedSite === item.id ? '#ffffff' : '#11181c',
+                        }}
                       >
                         {item.name}
                       </Text>
@@ -169,10 +179,16 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   onPress={handleClockIn}
                   disabled={loading || !selectedSite}
-                  className="bg-primary rounded-lg py-3 mt-2"
-                  style={{ opacity: loading || !selectedSite ? 0.6 : 1 }}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: '#2d7a3a',
+                    borderRadius: 8,
+                    paddingVertical: 12,
+                    marginTop: 8,
+                    opacity: loading || !selectedSite ? 0.6 : 1,
+                  }}
                 >
-                  <Text className="text-center text-white font-semibold">Clock In</Text>
+                  <Text style={{ textAlign: 'center', color: '#ffffff', fontWeight: '600' }}>Clock In</Text>
                 </TouchableOpacity>
               </>
             )}

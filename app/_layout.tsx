@@ -36,6 +36,10 @@ function RootLayoutContent() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+    // Initialize default data for local storage
+    import('@/lib/local-storage').then(({ initializeDefaultData: init }) => {
+      init();
+    });
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

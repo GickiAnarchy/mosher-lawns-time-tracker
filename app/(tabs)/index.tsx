@@ -1,204 +1,326 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, FlatList, TextInput, Alert } from 'react-native';
-import { ScreenContainer } from '@/components/screen-container';
-import { useRouter } from 'expo-router';
-import * as Storage from '@/lib/local-storage';
+import { ScreenContainer } from "@/components/screen-container";
+import {
+  addTimeLog,
+  clockOutTimeLog,
+  deleteTimeLog,
+  Employee,
+  getActiveTimeLog,
+  getEmployees,
+  getJobSites,
+  JobSite,
+  TimeLog,
+} from "@/lib/local-storage";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useColors } from "@/hooks/use-colors";
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const [employees, setEmployees] = useState<Storage.Employee[]>([]);
-  const [jobs, setJobs] = useState<Storage.JobSite[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [selectedJob, setSelectedJob] = useState<string>('');
-  const [activeLog, setActiveLog] = useState<Storage.TimeLog | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
+export default function ClockInOutScreen() {
+  const colors = useColors();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [jobSites, setJobSites] = useState<JobSite[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedJobSite, setSelectedJobSite] = useState<JobSite | null>(null);
+  const [activeLog, setActiveLog] = useState<TimeLog | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string>("");
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (!activeLog) return;
-
-    const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - activeLog.clockInTime) / 1000));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeLog]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const loadData = async () => {
-    const emps = await Storage.getEmployees();
-    const jbs = await Storage.getJobSites();
-    setEmployees(emps);
-    setJobs(jbs);
+    try {
+      setLoading(true);
+      const emps = await getEmployees();
+      const sites = await getJobSites();
+      setEmployees(emps);
+      setJobSites(sites);
 
-    if (emps.length > 0 && !selectedEmployee) {
-      setSelectedEmployee(emps[0].id);
-      const active = await Storage.getActiveTimeLog(emps[0].id);
-      setActiveLog(active);
+      if (emps.length > 0 && !selectedEmployee) {
+        setSelectedEmployee(emps[0]);
+      }
+      if (sites.length > 0 && !selectedJobSite) {
+        setSelectedJobSite(sites[0]);
+      }
+
+      if (selectedEmployee) {
+        const active = await getActiveTimeLog(selectedEmployee.id);
+        setActiveLog(active);
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleEmployeeChange = async (empId: string) => {
-    setSelectedEmployee(empId);
-    const active = await Storage.getActiveTimeLog(empId);
-    setActiveLog(active);
-    setElapsedTime(0);
   };
 
   const handleClockIn = async () => {
-    if (!selectedEmployee || !selectedJob) {
-      Alert.alert('Error', 'Please select an employee and job site');
+    if (!selectedEmployee || !selectedJobSite) {
+      setMessage("Please select an employee and job site");
       return;
     }
 
-    const log = await Storage.addTimeLog(selectedEmployee, selectedJob);
-    setActiveLog(log);
-    setElapsedTime(0);
-    Alert.alert('Success', 'Clocked in');
+    try {
+      setLoading(true);
+      await addTimeLog(selectedEmployee.id, selectedJobSite.id);
+      const active = await getActiveTimeLog(selectedEmployee.id);
+      setActiveLog(active);
+      setMessage("Clocked in successfully");
+      setTimeout(() => setMessage(""), 2000);
+    } catch (error) {
+      setMessage("Error clocking in");
+      console.error("Error clocking in:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClockOut = async () => {
     if (!activeLog) return;
 
-    await Storage.clockOutTimeLog(activeLog.id);
-    setActiveLog(null);
-    setElapsedTime(0);
-    Alert.alert('Success', 'Clocked out');
+    try {
+      setLoading(true);
+      await clockOutTimeLog(activeLog.id);
+      setActiveLog(null);
+      setMessage("Clocked out successfully");
+      setTimeout(() => setMessage(""), 2000);
+    } catch (error) {
+      setMessage("Error clocking out");
+      console.error("Error clocking out:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const handleDeleteLog = async (logId: string) => {
+    try {
+      setLoading(true);
+      await deleteTimeLog(logId);
+      if (activeLog?.id === logId) {
+        setActiveLog(null);
+      }
+      setMessage("Time log deleted");
+      setTimeout(() => setMessage(""), 2000);
+    } catch (error) {
+      setMessage("Error deleting log");
+      console.error("Error deleting log:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const getElapsedTime = (clockInTime: number) => {
+    const elapsed = Date.now() - clockInTime;
+    const hours = Math.floor(elapsed / (1000 * 60 * 60));
+    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
+  const getJobSiteName = (siteId: string) => {
+    return jobSites.find(s => s.id === siteId)?.name || "Unknown";
+  };
+
+  const getEmployeeName = (empId: string) => {
+    return employees.find(e => e.id === empId)?.name || "Unknown";
+  };
+
+  if (loading && employees.length === 0) {
+    return (
+      <ScreenContainer className="items-center justify-center">
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer className="p-4">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="gap-4">
+        <View className="gap-6">
           {/* Header */}
-          <View className="flex-row justify-between items-center">
-            <Text className="text-2xl font-bold text-foreground">Clock In/Out</Text>
-            <Pressable
-              onPress={() => router.push('/data-management')}
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Text className="text-primary font-semibold">Manage Data</Text>
-            </Pressable>
+          <View className="gap-2">
+            <Text className="text-3xl font-bold text-foreground">Clock In/Out</Text>
+            <Text className="text-sm text-muted">Select employee and job site</Text>
           </View>
 
           {/* Employee Selection */}
-          <View>
-            <Text className="text-sm font-semibold text-foreground mb-2">Select Employee</Text>
-            <FlatList
-              data={employees}
-              keyExtractor={e => e.id}
-              scrollEnabled={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => handleEmployeeChange(item.id)}
-                  style={({ pressed }) => [
-                    {
-                      padding: 12,
-                      marginBottom: 8,
-                      backgroundColor: selectedEmployee === item.id ? '#4CAF50' : '#f0f0f0',
-                      borderRadius: 8,
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <Text
+          <View className="gap-2">
+            <Text className="text-base font-semibold text-foreground">Select Employee</Text>
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8,
+                overflow: "hidden",
+              }}
+            >
+              <FlatList
+                data={employees}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => setSelectedEmployee(item)}
                     style={{
-                      color: selectedEmployee === item.id ? 'white' : 'black',
-                      fontWeight: '500',
+                      backgroundColor:
+                        selectedEmployee?.id === item.id ? colors.primary : colors.surface,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
                     }}
                   >
-                    {item.name}
-                  </Text>
-                </Pressable>
-              )}
-            />
+                    <Text
+                      style={{
+                        color:
+                          selectedEmployee?.id === item.id ? "white" : colors.foreground,
+                        fontSize: 16,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
           </View>
 
-          {/* Job Selection */}
-          <View>
-            <Text className="text-sm font-semibold text-foreground mb-2">Select Job Site</Text>
-            <FlatList
-              data={jobs}
-              keyExtractor={j => j.id}
-              scrollEnabled={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => setSelectedJob(item.id)}
-                  style={({ pressed }) => [
-                    {
-                      padding: 12,
-                      marginBottom: 8,
-                      backgroundColor: selectedJob === item.id ? '#4CAF50' : '#f0f0f0',
-                      borderRadius: 8,
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <Text
+          {/* Job Site Selection */}
+          <View className="gap-2">
+            <Text className="text-base font-semibold text-foreground">Select Job Site</Text>
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8,
+                overflow: "hidden",
+              }}
+            >
+              <FlatList
+                data={jobSites}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => setSelectedJobSite(item)}
                     style={{
-                      color: selectedJob === item.id ? 'white' : 'black',
-                      fontWeight: '500',
+                      backgroundColor:
+                        selectedJobSite?.id === item.id ? colors.primary : colors.surface,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
                     }}
                   >
-                    {item.name}
-                  </Text>
-                </Pressable>
-              )}
-            />
+                    <Text
+                      style={{
+                        color:
+                          selectedJobSite?.id === item.id ? "white" : colors.foreground,
+                        fontSize: 16,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={{
+                        color:
+                          selectedJobSite?.id === item.id
+                            ? "rgba(255,255,255,0.7)"
+                            : colors.muted,
+                        fontSize: 13,
+                        marginTop: 4,
+                      }}
+                    >
+                      {item.location}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
           </View>
 
-          {/* Status */}
-          <View className="bg-surface p-4 rounded-lg">
-            <Text className="text-sm text-muted mb-2">Status</Text>
-            <Text className="text-lg font-bold text-foreground">
-              {activeLog ? 'Clocked In' : 'Clocked Out'}
-            </Text>
-            {activeLog && (
-              <Text className="text-2xl font-bold text-primary mt-2">{formatTime(elapsedTime)}</Text>
-            )}
-          </View>
+          {/* Status Section */}
+          {activeLog && (
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 8,
+                padding: 16,
+                borderLeftWidth: 4,
+                borderLeftColor: colors.warning,
+              }}
+            >
+              <Text className="text-sm text-muted mb-2">Currently Clocked In</Text>
+              <Text className="text-lg font-semibold text-foreground mb-1">
+                {getEmployeeName(activeLog.employeeId)}
+              </Text>
+              <Text className="text-sm text-muted mb-3">
+                {getJobSiteName(activeLog.jobSiteId)}
+              </Text>
+              <Text className="text-2xl font-bold text-warning">
+                {getElapsedTime(activeLog.clockInTime)}
+              </Text>
+            </View>
+          )}
 
-          {/* Buttons */}
+          {/* Action Buttons */}
           <View className="gap-3">
             {!activeLog ? (
               <Pressable
                 onPress={handleClockIn}
-                style={({ pressed }) => [
-                  {
-                    padding: 16,
-                    backgroundColor: '#4CAF50',
-                    borderRadius: 8,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
+                disabled={loading}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 16,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  opacity: loading ? 0.6 : 1,
+                }}
               >
-                <Text className="text-center text-white font-bold text-lg">Clock In</Text>
+                <Text className="text-base font-semibold text-white">Clock In</Text>
               </Pressable>
             ) : (
               <Pressable
                 onPress={handleClockOut}
-                style={({ pressed }) => [
-                  {
-                    padding: 16,
-                    backgroundColor: '#f44336',
-                    borderRadius: 8,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
+                disabled={loading}
+                style={{
+                  backgroundColor: colors.error,
+                  paddingVertical: 16,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  opacity: loading ? 0.6 : 1,
+                }}
               >
-                <Text className="text-center text-white font-bold text-lg">Clock Out</Text>
+                <Text className="text-base font-semibold text-white">Clock Out</Text>
               </Pressable>
             )}
           </View>
+
+          {/* Message */}
+          {message && (
+            <View
+              style={{
+                backgroundColor: colors.success,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 8,
+              }}
+            >
+              <Text className="text-sm font-medium text-white text-center">{message}</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </ScreenContainer>

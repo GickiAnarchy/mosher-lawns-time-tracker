@@ -8,6 +8,7 @@ export interface Employee {
 export interface JobSite {
   id: string;
   name: string;
+  location: string;
 }
 
 export interface TimeLog {
@@ -36,9 +37,14 @@ export async function getEmployees(): Promise<Employee[]> {
   }
 }
 
-export async function addEmployee(name: string): Promise<Employee> {
+export async function addEmployee(name: string): Promise<Employee | null> {
   try {
     const employees = await getEmployees();
+    // Check for duplicate name
+    if (employees.some(emp => emp.name.toLowerCase() === name.toLowerCase())) {
+      console.warn('Employee with this name already exists');
+      return null;
+    }
     const newEmployee: Employee = {
       id: Date.now().toString(),
       name,
@@ -90,28 +96,35 @@ export async function getJobSites(): Promise<JobSite[]> {
   }
 }
 
-export async function addJobSite(name: string): Promise<JobSite> {
+export async function addJobSite(name: string, location: string): Promise<JobSite | null> {
   try {
-    const sites = await getJobSites();
-    const newSite: JobSite = {
+    const jobSites = await getJobSites();
+    // Check for duplicate name
+    if (jobSites.some(site => site.name.toLowerCase() === name.toLowerCase())) {
+      console.warn('Job site with this name already exists');
+      return null;
+    }
+    const newJobSite: JobSite = {
       id: Date.now().toString(),
       name,
+      location,
     };
-    sites.push(newSite);
-    await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
-    return newSite;
+    jobSites.push(newJobSite);
+    await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(jobSites));
+    return newJobSite;
   } catch (error) {
     console.error('Error adding job site:', error);
     throw error;
   }
 }
 
-export async function updateJobSite(id: string, name: string): Promise<void> {
+export async function updateJobSite(id: string, name: string, location: string): Promise<void> {
   try {
     const sites = await getJobSites();
     const index = sites.findIndex(s => s.id === id);
     if (index !== -1) {
       sites[index].name = name;
+      sites[index].location = location;
       await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
     }
   } catch (error) {
@@ -218,9 +231,9 @@ export async function initializeDefaultData(): Promise<void> {
 
     const sites = await getJobSites();
     if (sites.length === 0) {
-      await addJobSite('Downtown Site');
-      await addJobSite('North Site');
-      await addJobSite('South Warehouse');
+      await addJobSite('Downtown Site', '123 Main St, Downtown');
+      await addJobSite('North Site', '456 North Ave, North District');
+      await addJobSite('South Warehouse', '789 South Blvd, South Industrial');
     }
   } catch (error) {
     console.error('Error initializing default data:', error);

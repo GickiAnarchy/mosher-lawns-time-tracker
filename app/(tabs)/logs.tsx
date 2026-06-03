@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, FlatList, Pressable, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import * as Storage from '@/lib/local-storage';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
+import { useColors } from '@/hooks/use-colors';
 
 export default function LogsScreen() {
+  const router = useRouter();
+  const colors = useColors();
   const [logs, setLogs] = useState<Storage.TimeLog[]>([]);
   const [employees, setEmployees] = useState<Map<string, string>>(new Map());
   const [jobs, setJobs] = useState<Map<string, string>>(new Map());
@@ -59,7 +62,28 @@ export default function LogsScreen() {
     <ScreenContainer className="p-4">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="gap-4">
-          <Text className="text-2xl font-bold text-foreground">Time Logs</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Text className="text-2xl font-bold text-foreground">Time Logs</Text>
+            <Pressable
+              onPress={() => router.push('/jobs-management')}
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 6,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                Manage Jobs
+              </Text>
+            </Pressable>
+          </View>
 
           {logs.length === 0 ? (
             <Text className="text-center text-muted mt-8">No time logs yet</Text>
@@ -72,7 +96,7 @@ export default function LogsScreen() {
                 <View
                   style={{
                     borderWidth: 1,
-                    borderColor: '#ddd',
+                    borderColor: colors.border,
                     borderRadius: 8,
                     padding: 12,
                     marginBottom: 8,
@@ -98,20 +122,23 @@ export default function LogsScreen() {
                     )}
                   </View>
 
-                  <View className="flex-row justify-between items-center">
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <Text className="font-bold text-primary">
                       {calculateDuration(item.clockInTime, item.clockOutTime)}
                     </Text>
                     <Pressable
                       onPress={() => handleDeleteLog(item.id)}
-                      style={({ pressed }) => [
-                        {
-                          padding: 8,
-                          backgroundColor: '#f44336',
-                          borderRadius: 6,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
+                      style={{
+                        padding: 8,
+                        backgroundColor: colors.error,
+                        borderRadius: 6,
+                      }}
                     >
                       <Text className="text-white font-semibold text-sm">Delete</Text>
                     </Pressable>

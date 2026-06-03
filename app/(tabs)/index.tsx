@@ -27,9 +27,9 @@ export default function ClockInOutScreen() {
   const colors = useColors();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [jobSites, setJobSites] = useState<JobSite[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedJobSite, setSelectedJobSite] = useState<JobSite | null>(null);
-  const [activeLog, setActiveLog] = useState<TimeLog | null>(null);
+  const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
 
@@ -47,17 +47,19 @@ export default function ClockInOutScreen() {
       setEmployees(emps);
       setJobSites(sites);
 
-      if (emps.length > 0 && !selectedEmployee) {
-        setSelectedEmployee(emps[0]);
-      }
       if (sites.length > 0 && !selectedJobSite) {
         setSelectedJobSite(sites[0]);
       }
 
-      if (selectedEmployee) {
-        const active = await getActiveTimeLog(selectedEmployee.id);
-        setActiveLog(active);
+      // Load all active logs
+      const logs: TimeLog[] = [];
+      for (const emp of emps) {
+        const active = await getActiveTimeLog(emp.id);
+        if (active) {
+          logs.push(active);
+        }
       }
+      setActiveLogs(logs);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -65,18 +67,30 @@ export default function ClockInOutScreen() {
     }
   };
 
-  const handleClockIn = async () => {
-    if (!selectedEmployee || !selectedJobSite) {
-      setMessage("Please select an employee and job site");
+  const toggleEmployeeSelection = (employeeId: string) => {
+    const newSelected = new Set(selectedEmployees);
+    if (newSelected.has(employeeId)) {
+      newSelected.delete(employeeId);
+    } else {
+      newSelected.add(employeeId);
+    }
+    setSelectedEmployees(newSelected);
+  };
+
+  const handleClockInMultiple = async () => {
+    if (selectedEmployees.size === 0 || !selectedJobSite) {
+      setMessage("Please select employees and job site");
       return;
     }
 
     try {
       setLoading(true);
-      await addTimeLog(selectedEmployee.id, selectedJobSite.id);
-      const active = await getActiveTimeLog(selectedEmployee.id);
-      setActiveLog(active);
-      setMessage("Clocked in successfully");
+      for (const empId of selectedEmployees) {
+        await addTimeLog(empId, selectedJobSite.id);
+      }
+      setSelectedEmployees(new Set());
+      await loadData();
+      setMessage(`Clocked in ${selectedEmployees.size} employee(s)`);
       setTimeout(() => setMessage(""), 2000);
     } catch (error) {
       setMessage("Error clocking in");
@@ -86,35 +100,16 @@ export default function ClockInOutScreen() {
     }
   };
 
-  const handleClockOut = async () => {
-    if (!activeLog) return;
-
+  const handleClockOut = async (logId: string) => {
     try {
       setLoading(true);
-      await clockOutTimeLog(activeLog.id);
-      setActiveLog(null);
+      await clockOutTimeLog(logId);
+      await loadData();
       setMessage("Clocked out successfully");
       setTimeout(() => setMessage(""), 2000);
     } catch (error) {
       setMessage("Error clocking out");
       console.error("Error clocking out:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteLog = async (logId: string) => {
-    try {
-      setLoading(true);
-      await deleteTimeLog(logId);
-      if (activeLog?.id === logId) {
-        setActiveLog(null);
-      }
-      setMessage("Time log deleted");
-      setTimeout(() => setMessage(""), 2000);
-    } catch (error) {
-      setMessage("Error deleting log");
-      console.error("Error deleting log:", error);
     } finally {
       setLoading(false);
     }
@@ -150,12 +145,14 @@ export default function ClockInOutScreen() {
           {/* Header */}
           <View className="gap-2">
             <Text className="text-3xl font-bold text-foreground">Clock In/Out</Text>
-            <Text className="text-sm text-muted">Select employee and job site</Text>
+            <Text className="text-sm text-muted">Select employees and job site</Text>
           </View>
 
-          {/* Employee Selection */}
+          {/* Employee Selection - Multiple */}
           <View className="gap-2">
-            <Text className="text-base font-semibold text-foreground">Select Employee</Text>
+            <Text className="text-base font-semibold text-foreground">
+              Select Employees ({selectedEmployees.size})
+            </Text>
             <View
               style={{
                 borderWidth: 1,
@@ -170,26 +167,34 @@ export default function ClockInOutScreen() {
                 scrollEnabled={false}
                 renderItem={({ item }) => (
                   <Pressable
-                    onPress={() => setSelectedEmployee(item)}
+                    onPress={() => toggleEmployeeSelection(item.id)}
                     style={{
-                      backgroundColor:
-                        selectedEmployee?.id === item.id ? colors.primary : colors.surface,
+                      backgroundColor: selectedEmployees.has(item.id)
+                        ? colors.primary
+                        : colors.surface,
                       paddingVertical: 12,
                       paddingHorizontal: 16,
                       borderBottomWidth: 1,
                       borderBottomColor: colors.border,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
                     <Text
                       style={{
-                        color:
-                          selectedEmployee?.id === item.id ? "white" : colors.foreground,
+                        color: selectedEmployees.has(item.id)
+                          ? "white"
+                          : colors.foreground,
                         fontSize: 16,
                         fontWeight: "500",
                       }}
                     >
                       {item.name}
                     </Text>
+                    {selectedEmployees.has(item.id) && (
+                      <Text style={{ color: "white", fontSize: 18 }}>✓</Text>
+                    )}
                   </Pressable>
                 )}
               />
@@ -251,62 +256,112 @@ export default function ClockInOutScreen() {
             </View>
           </View>
 
-          {/* Status Section */}
-          {activeLog && (
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 8,
-                padding: 16,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.warning,
-              }}
-            >
-              <Text className="text-sm text-muted mb-2">Currently Clocked In</Text>
-              <Text className="text-lg font-semibold text-foreground mb-1">
-                {getEmployeeName(activeLog.employeeId)}
+          {/* Active Clocks Section */}
+          {activeLogs.length > 0 && (
+            <View className="gap-2">
+              <Text className="text-base font-semibold text-foreground">
+                Currently Clocked In ({activeLogs.length})
               </Text>
-              <Text className="text-sm text-muted mb-3">
-                {getJobSiteName(activeLog.jobSiteId)}
-              </Text>
-              <Text className="text-2xl font-bold text-warning">
-                {getElapsedTime(activeLog.clockInTime)}
-              </Text>
+              <FlatList
+                data={activeLogs}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View
+                    style={{
+                      backgroundColor: colors.surface,
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 8,
+                      borderLeftWidth: 4,
+                      borderLeftColor: colors.warning,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "600",
+                            color: colors.foreground,
+                            marginBottom: 2,
+                          }}
+                        >
+                          {getEmployeeName(item.employeeId)}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: colors.muted,
+                            marginBottom: 4,
+                          }}
+                        >
+                          {getJobSiteName(item.jobSiteId)}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 18,
+                            fontWeight: "bold",
+                            color: colors.warning,
+                          }}
+                        >
+                          {getElapsedTime(item.clockInTime)}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => handleClockOut(item.id)}
+                        disabled={loading}
+                        style={{
+                          backgroundColor: colors.error,
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 6,
+                          opacity: loading ? 0.6 : 1,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            fontSize: 12,
+                            fontWeight: "600",
+                          }}
+                        >
+                          Clock Out
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              />
             </View>
           )}
 
-          {/* Action Buttons */}
-          <View className="gap-3">
-            {!activeLog ? (
-              <Pressable
-                onPress={handleClockIn}
-                disabled={loading}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingVertical: 16,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  opacity: loading ? 0.6 : 1,
-                }}
-              >
-                <Text className="text-base font-semibold text-white">Clock In</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={handleClockOut}
-                disabled={loading}
-                style={{
-                  backgroundColor: colors.error,
-                  paddingVertical: 16,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  opacity: loading ? 0.6 : 1,
-                }}
-              >
-                <Text className="text-base font-semibold text-white">Clock Out</Text>
-              </Pressable>
-            )}
-          </View>
+          {/* Action Button */}
+          <Pressable
+            onPress={handleClockInMultiple}
+            disabled={loading || selectedEmployees.size === 0}
+            style={{
+              backgroundColor:
+                selectedEmployees.size === 0 ? colors.border : colors.primary,
+              paddingVertical: 16,
+              borderRadius: 8,
+              alignItems: "center",
+              opacity: loading || selectedEmployees.size === 0 ? 0.6 : 1,
+            }}
+          >
+            <Text className="text-base font-semibold text-white">
+              Clock In {selectedEmployees.size > 0 ? `(${selectedEmployees.size})` : ""}
+            </Text>
+          </Pressable>
 
           {/* Message */}
           {message && (

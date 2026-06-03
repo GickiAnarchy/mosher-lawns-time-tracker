@@ -41,3 +41,8 @@
 - [ ] Test clock in/out with available jobs and employees
 - [ ] Verify minimal UI is clean and functional
 - [ ] Save checkpoint and generate APK
+
+## Phase 7: New Features
+- [ ] Clock in multiple employees at once
+- [ ] Add/Edit jobs dedicated page (separate from data management)
+- [ ] Fix log deletion functionality

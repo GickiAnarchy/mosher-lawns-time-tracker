@@ -1,19 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useRouter } from 'expo-router';
 import * as Storage from '@/lib/local-storage';
 import { useColors } from '@/hooks/use-colors';
 
-export default function JobsManagementScreen() {
+export default function EmployeesManagementScreen() {
   const router = useRouter();
   const colors = useColors();
-  const [jobs, setJobs] = useState<Storage.JobSite[]>([]);
-  const [newJobName, setNewJobName] = useState('');
-  const [newJobLocation, setNewJobLocation] = useState('');
-  const [editingJobId, setEditingJobId] = useState<string | null>(null);
-  const [editingJobName, setEditingJobName] = useState('');
-  const [editingJobLocation, setEditingJobLocation] = useState('');
+  const [employees, setEmployees] = useState<Storage.Employee[]>([]);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [editingEmployeeName, setEditingEmployeeName] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -23,57 +21,55 @@ export default function JobsManagementScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const jbs = await Storage.getJobSites();
-      setJobs(jbs);
+      const emps = await Storage.getEmployees();
+      setEmployees(emps);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddJob = async () => {
-    if (!newJobName.trim() || !newJobLocation.trim()) {
-      Alert.alert('Error', 'Please enter job name and location');
+  const handleAddEmployee = async () => {
+    if (!newEmployeeName.trim()) {
+      Alert.alert('Error', 'Please enter employee name');
       return;
     }
-    const result = await Storage.addJobSite(newJobName, newJobLocation);
+    const result = await Storage.addEmployee(newEmployeeName);
     if (result === null) {
-      Alert.alert('Error', 'Job site with this name already exists');
+      Alert.alert('Error', 'Employee with this name already exists');
     } else {
-      setNewJobName('');
-      setNewJobLocation('');
+      setNewEmployeeName('');
       loadData();
-      Alert.alert('Success', 'Job added');
+      Alert.alert('Success', 'Employee added');
     }
   };
 
-  const handleUpdateJob = async (id: string) => {
-    if (!editingJobName.trim() || !editingJobLocation.trim()) {
-      Alert.alert('Error', 'Please enter job name and location');
+  const handleUpdateEmployee = async (id: string) => {
+    if (!editingEmployeeName.trim()) {
+      Alert.alert('Error', 'Please enter employee name');
       return;
     }
-    await Storage.updateJobSite(id, editingJobName, editingJobLocation);
-    setEditingJobId(null);
-    setEditingJobName('');
-    setEditingJobLocation('');
+    await Storage.updateEmployee(id, editingEmployeeName);
+    setEditingEmployeeId(null);
+    setEditingEmployeeName('');
     loadData();
-    Alert.alert('Success', 'Job updated');
+    Alert.alert('Success', 'Employee updated');
   };
 
-  const handleDeleteJob = (id: string) => {
-    Alert.alert('Delete Job', 'Are you sure?', [
+  const handleDeleteEmployee = (id: string) => {
+    Alert.alert('Delete Employee', 'Are you sure?', [
       { text: 'Cancel', onPress: () => {} },
       {
         text: 'Delete',
         onPress: async () => {
-          await Storage.deleteJobSite(id);
+          await Storage.deleteEmployee(id);
           loadData();
-          Alert.alert('Success', 'Job deleted');
+          Alert.alert('Success', 'Employee deleted');
         },
       },
     ]);
   };
 
-  if (loading && jobs.length === 0) {
+  if (loading && employees.length === 0) {
     return (
       <ScreenContainer className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -93,14 +89,14 @@ export default function JobsManagementScreen() {
               </Text>
             </Pressable>
             <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.foreground }}>
-              Manage Job Sites
+              Manage Employees
             </Text>
             <Text style={{ fontSize: 14, color: colors.muted }}>
-              Add, edit, or delete job sites
+              Add, edit, or delete employees
             </Text>
           </View>
 
-          {/* Add Job Section */}
+          {/* Add Employee Section */}
           <View
             style={{
               backgroundColor: colors.surface,
@@ -112,27 +108,12 @@ export default function JobsManagementScreen() {
             }}
           >
             <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground }}>
-              Add New Job Site
+              Add New Employee
             </Text>
             <TextInput
-              placeholder="Job site name"
-              value={newJobName}
-              onChangeText={setNewJobName}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 12,
-                color: colors.foreground,
-                fontSize: 14,
-              }}
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              placeholder="Location / Address"
-              value={newJobLocation}
-              onChangeText={setNewJobLocation}
+              placeholder="Employee name"
+              value={newEmployeeName}
+              onChangeText={setNewEmployeeName}
               style={{
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -145,7 +126,7 @@ export default function JobsManagementScreen() {
               placeholderTextColor={colors.muted}
             />
             <Pressable
-              onPress={handleAddJob}
+              onPress={handleAddEmployee}
               disabled={loading}
               style={{
                 backgroundColor: colors.success,
@@ -156,20 +137,20 @@ export default function JobsManagementScreen() {
               }}
             >
               <Text style={{ fontSize: 14, fontWeight: '600', color: 'white' }}>
-                Add Job Site
+                Add Employee
               </Text>
             </Pressable>
           </View>
 
-          {/* Jobs List Section */}
+          {/* Employees List Section */}
           <View style={{ gap: 12 }}>
             <View>
               <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground }}>
-                Job Sites ({jobs.length})
+                Employees ({employees.length})
               </Text>
             </View>
 
-            {jobs.length === 0 ? (
+            {employees.length === 0 ? (
               <View
                 style={{
                   backgroundColor: colors.surface,
@@ -180,12 +161,12 @@ export default function JobsManagementScreen() {
                   borderColor: colors.border,
                 }}
               >
-                <Text style={{ color: colors.muted, fontSize: 14 }}>No job sites yet</Text>
+                <Text style={{ color: colors.muted, fontSize: 14 }}>No employees yet</Text>
               </View>
             ) : (
               <FlatList
-                data={jobs}
-                keyExtractor={j => j.id}
+                data={employees}
+                keyExtractor={e => e.id}
                 scrollEnabled={false}
                 renderItem={({ item }) => (
                   <View
@@ -199,27 +180,12 @@ export default function JobsManagementScreen() {
                       gap: 12,
                     }}
                   >
-                    {editingJobId === item.id ? (
+                    {editingEmployeeId === item.id ? (
                       <View style={{ gap: 12 }}>
                         <TextInput
-                          value={editingJobName}
-                          onChangeText={setEditingJobName}
-                          placeholder="Job site name"
-                          style={{
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            borderRadius: 8,
-                            paddingHorizontal: 12,
-                            paddingVertical: 10,
-                            color: colors.foreground,
-                            fontSize: 14,
-                          }}
-                          placeholderTextColor={colors.muted}
-                        />
-                        <TextInput
-                          value={editingJobLocation}
-                          onChangeText={setEditingJobLocation}
-                          placeholder="Location / Address"
+                          value={editingEmployeeName}
+                          onChangeText={setEditingEmployeeName}
+                          placeholder="Employee name"
                           style={{
                             borderWidth: 1,
                             borderColor: colors.border,
@@ -233,7 +199,7 @@ export default function JobsManagementScreen() {
                         />
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
-                            onPress={() => handleUpdateJob(item.id)}
+                            onPress={() => handleUpdateEmployee(item.id)}
                             style={{
                               flex: 1,
                               backgroundColor: colors.success,
@@ -247,7 +213,7 @@ export default function JobsManagementScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => setEditingJobId(null)}
+                            onPress={() => setEditingEmployeeId(null)}
                             style={{
                               flex: 1,
                               backgroundColor: colors.border,
@@ -264,20 +230,14 @@ export default function JobsManagementScreen() {
                       </View>
                     ) : (
                       <View style={{ gap: 12 }}>
-                        <View>
-                          <Text style={{ fontSize: 16, fontWeight: '500', color: colors.foreground }}>
-                            {item.name}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
-                            {item.location}
-                          </Text>
-                        </View>
+                        <Text style={{ fontSize: 16, fontWeight: '500', color: colors.foreground }}>
+                          {item.name}
+                        </Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
                             onPress={() => {
-                              setEditingJobId(item.id);
-                              setEditingJobName(item.name);
-                              setEditingJobLocation(item.location);
+                              setEditingEmployeeId(item.id);
+                              setEditingEmployeeName(item.name);
                             }}
                             style={{
                               flex: 1,
@@ -292,7 +252,7 @@ export default function JobsManagementScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => handleDeleteJob(item.id)}
+                            onPress={() => handleDeleteEmployee(item.id)}
                             style={{
                               flex: 1,
                               backgroundColor: colors.error,

@@ -1,37 +1,20 @@
-import { ScreenContainer } from "@/components/screen-container";
-import {
-  addTimeLog,
-  clockOutTimeLog,
-  deleteTimeLog,
-  Employee,
-  getActiveTimeLog,
-  getEmployees,
-  getJobSites,
-  JobSite,
-  TimeLog,
-} from "@/lib/local-storage";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useColors } from "@/hooks/use-colors";
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, FlatList, Alert, ActivityIndicator } from 'react-native';
+import { ScreenContainer } from '@/components/screen-container';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import * as Storage from '@/lib/local-storage';
+import { useColors } from '@/hooks/use-colors';
 
 export default function ClockInOutScreen() {
+  const router = useRouter();
   const colors = useColors();
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [jobSites, setJobSites] = useState<JobSite[]>([]);
+  const [employees, setEmployees] = useState<Storage.Employee[]>([]);
+  const [jobSites, setJobSites] = useState<Storage.JobSite[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
-  const [selectedJobSite, setSelectedJobSite] = useState<JobSite | null>(null);
-  const [activeLogs, setActiveLogs] = useState<TimeLog[]>([]);
+  const [selectedJobSite, setSelectedJobSite] = useState<string | null>(null);
+  const [activeLogs, setActiveLogs] = useState<Map<string, Storage.TimeLog>>(new Map());
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string>("");
 
   useFocusEffect(
     useCallback(() => {
@@ -42,26 +25,21 @@ export default function ClockInOutScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const emps = await getEmployees();
-      const sites = await getJobSites();
+      const emps = await Storage.getEmployees();
+      const jobs = await Storage.getJobSites();
+      const logs = await Storage.getTimeLogs();
+
       setEmployees(emps);
-      setJobSites(sites);
+      setJobSites(jobs);
 
-      if (sites.length > 0 && !selectedJobSite) {
-        setSelectedJobSite(sites[0]);
-      }
-
-      // Load all active logs
-      const logs: TimeLog[] = [];
-      for (const emp of emps) {
-        const active = await getActiveTimeLog(emp.id);
-        if (active) {
-          logs.push(active);
+      // Find active logs (no clock out time)
+      const active = new Map<string, Storage.TimeLog>();
+      logs.forEach(log => {
+        if (!log.clockOutTime) {
+          active.set(log.employeeId, log);
         }
-      }
-      setActiveLogs(logs);
-    } catch (error) {
-      console.error("Error loading data:", error);
+      });
+      setActiveLogs(active);
     } finally {
       setLoading(false);
     }
@@ -77,24 +55,25 @@ export default function ClockInOutScreen() {
     setSelectedEmployees(newSelected);
   };
 
-  const handleClockInMultiple = async () => {
-    if (selectedEmployees.size === 0 || !selectedJobSite) {
-      setMessage("Please select employees and job site");
+  const handleClockIn = async () => {
+    if (selectedEmployees.size === 0) {
+      Alert.alert('Error', 'Please select at least one employee');
+      return;
+    }
+    if (!selectedJobSite) {
+      Alert.alert('Error', 'Please select a job site');
       return;
     }
 
     try {
       setLoading(true);
       for (const empId of selectedEmployees) {
-        await addTimeLog(empId, selectedJobSite.id);
+        await Storage.addTimeLog(empId, selectedJobSite);
       }
       setSelectedEmployees(new Set());
-      await loadData();
-      setMessage(`Clocked in ${selectedEmployees.size} employee(s)`);
-      setTimeout(() => setMessage(""), 2000);
-    } catch (error) {
-      setMessage("Error clocking in");
-      console.error("Error clocking in:", error);
+      setSelectedJobSite(null);
+      loadData();
+      Alert.alert('Success', `${selectedEmployees.size} employee(s) clocked in`);
     } finally {
       setLoading(false);
     }
@@ -103,31 +82,12 @@ export default function ClockInOutScreen() {
   const handleClockOut = async (logId: string) => {
     try {
       setLoading(true);
-      await clockOutTimeLog(logId);
-      await loadData();
-      setMessage("Clocked out successfully");
-      setTimeout(() => setMessage(""), 2000);
-    } catch (error) {
-      setMessage("Error clocking out");
-      console.error("Error clocking out:", error);
+      await Storage.clockOutTimeLog(logId);
+      loadData();
+      Alert.alert('Success', 'Employee clocked out');
     } finally {
       setLoading(false);
     }
-  };
-
-  const getElapsedTime = (clockInTime: number) => {
-    const elapsed = Date.now() - clockInTime;
-    const hours = Math.floor(elapsed / (1000 * 60 * 60));
-    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const getJobSiteName = (siteId: string) => {
-    return jobSites.find(s => s.id === siteId)?.name || "Unknown";
-  };
-
-  const getEmployeeName = (empId: string) => {
-    return employees.find(e => e.id === empId)?.name || "Unknown";
   };
 
   if (loading && employees.length === 0) {
@@ -141,110 +101,222 @@ export default function ClockInOutScreen() {
   return (
     <ScreenContainer className="p-4">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="gap-6">
+        <View style={{ gap: 24 }}>
           {/* Header */}
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Clock In/Out</Text>
-            <Text className="text-sm text-muted">Select employees and job site</Text>
+          <View style={{ gap: 8 }}>
+            <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.foreground }}>
+              Clock In/Out
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.muted }}>
+              Select employees and job site
+            </Text>
           </View>
 
-          {/* Employee Selection - Multiple */}
-          <View className="gap-2">
-            <Text className="text-base font-semibold text-foreground">
-              Select Employees ({selectedEmployees.size})
-            </Text>
+          {/* Active Clocks Section */}
+          {activeLogs.size > 0 && (
             <View
               style={{
+                backgroundColor: colors.surface,
+                borderRadius: 12,
+                padding: 16,
                 borderWidth: 1,
                 borderColor: colors.border,
-                borderRadius: 8,
-                overflow: "hidden",
+                gap: 12,
               }}
             >
+              <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground }}>
+                Active Clocks
+              </Text>
+              <FlatList
+                data={Array.from(activeLogs.values())}
+                keyExtractor={log => log.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => {
+                  const emp = employees.find(e => e.id === item.employeeId);
+                  const job = jobSites.find(j => j.id === item.jobSiteId);
+                  const elapsed = Math.floor((Date.now() - item.clockInTime) / 60000);
+                  const hours = Math.floor(elapsed / 60);
+                  const mins = elapsed % 60;
+
+                  return (
+                    <View
+                      style={{
+                        backgroundColor: colors.background,
+                        borderRadius: 8,
+                        padding: 12,
+                        marginBottom: 8,
+                        borderLeftWidth: 4,
+                        borderLeftColor: colors.success,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.foreground }}>
+                          {emp?.name || 'Unknown'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.muted }}>
+                          {job?.name || 'Unknown'} • {hours}h {mins}m
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => handleClockOut(item.id)}
+                        style={{
+                          backgroundColor: colors.error,
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: 'white' }}>
+                          Clock Out
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          )}
+
+          {/* Select Employees Section */}
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground }}>
+              Select Employees ({selectedEmployees.size})
+            </Text>
+            {employees.length === 0 ? (
+              <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                <Text style={{ color: colors.muted, fontSize: 14 }}>No employees available</Text>
+              </View>
+            ) : (
               <FlatList
                 data={employees}
-                keyExtractor={(item) => item.id}
+                keyExtractor={e => e.id}
                 scrollEnabled={false}
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => toggleEmployeeSelection(item.id)}
                     style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 12,
+                      marginBottom: 8,
                       backgroundColor: selectedEmployees.has(item.id)
                         ? colors.primary
-                        : colors.surface,
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border,
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                        : colors.background,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: selectedEmployees.has(item.id)
+                        ? colors.primary
+                        : colors.border,
                     }}
                   >
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        borderWidth: 2,
+                        borderColor: selectedEmployees.has(item.id)
+                          ? 'white'
+                          : colors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12,
+                        backgroundColor: selectedEmployees.has(item.id)
+                          ? colors.primary
+                          : 'transparent',
+                      }}
+                    >
+                      {selectedEmployees.has(item.id) && (
+                        <Text style={{ color: 'white', fontWeight: 'bold' }}>✓</Text>
+                      )}
+                    </View>
                     <Text
                       style={{
+                        fontSize: 14,
+                        fontWeight: '500',
                         color: selectedEmployees.has(item.id)
-                          ? "white"
+                          ? 'white'
                           : colors.foreground,
-                        fontSize: 16,
-                        fontWeight: "500",
                       }}
                     >
                       {item.name}
                     </Text>
-                    {selectedEmployees.has(item.id) && (
-                      <Text style={{ color: "white", fontSize: 18 }}>✓</Text>
-                    )}
                   </Pressable>
                 )}
               />
-            </View>
+            )}
           </View>
 
-          {/* Job Site Selection */}
-          <View className="gap-2">
-            <Text className="text-base font-semibold text-foreground">Select Job Site</Text>
-            <View
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 8,
-                overflow: "hidden",
-              }}
-            >
+          {/* Select Job Site Section */}
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.foreground }}>
+              Select Job Site
+            </Text>
+            {jobSites.length === 0 ? (
+              <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                <Text style={{ color: colors.muted, fontSize: 14 }}>No job sites available</Text>
+              </View>
+            ) : (
               <FlatList
                 data={jobSites}
-                keyExtractor={(item) => item.id}
+                keyExtractor={j => j.id}
                 scrollEnabled={false}
                 renderItem={({ item }) => (
                   <Pressable
-                    onPress={() => setSelectedJobSite(item)}
+                    onPress={() => setSelectedJobSite(item.id)}
                     style={{
-                      backgroundColor:
-                        selectedJobSite?.id === item.id ? colors.primary : colors.surface,
                       paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border,
+                      paddingHorizontal: 12,
+                      marginBottom: 8,
+                      backgroundColor: selectedJobSite === item.id
+                        ? colors.primary
+                        : colors.background,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: selectedJobSite === item.id
+                        ? colors.primary
+                        : colors.border,
                     }}
                   >
                     <Text
                       style={{
-                        color:
-                          selectedJobSite?.id === item.id ? "white" : colors.foreground,
-                        fontSize: 16,
-                        fontWeight: "500",
+                        fontSize: 14,
+                        fontWeight: '500',
+                        color: selectedJobSite === item.id
+                          ? 'white'
+                          : colors.foreground,
                       }}
                     >
                       {item.name}
                     </Text>
                     <Text
                       style={{
-                        color:
-                          selectedJobSite?.id === item.id
-                            ? "rgba(255,255,255,0.7)"
-                            : colors.muted,
-                        fontSize: 13,
+                        fontSize: 12,
+                        color: selectedJobSite === item.id
+                          ? 'rgba(255,255,255,0.8)'
+                          : colors.muted,
                         marginTop: 4,
                       }}
                     >
@@ -253,129 +325,73 @@ export default function ClockInOutScreen() {
                   </Pressable>
                 )}
               />
-            </View>
+            )}
           </View>
 
-          {/* Active Clocks Section */}
-          {activeLogs.length > 0 && (
-            <View className="gap-2">
-              <Text className="text-base font-semibold text-foreground">
-                Currently Clocked In ({activeLogs.length})
-              </Text>
-              <FlatList
-                data={activeLogs}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <View
-                    style={{
-                      backgroundColor: colors.surface,
-                      borderRadius: 8,
-                      padding: 12,
-                      marginBottom: 8,
-                      borderLeftWidth: 4,
-                      borderLeftColor: colors.warning,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        marginBottom: 8,
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "600",
-                            color: colors.foreground,
-                            marginBottom: 2,
-                          }}
-                        >
-                          {getEmployeeName(item.employeeId)}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: colors.muted,
-                            marginBottom: 4,
-                          }}
-                        >
-                          {getJobSiteName(item.jobSiteId)}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 18,
-                            fontWeight: "bold",
-                            color: colors.warning,
-                          }}
-                        >
-                          {getElapsedTime(item.clockInTime)}
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => handleClockOut(item.id)}
-                        disabled={loading}
-                        style={{
-                          backgroundColor: colors.error,
-                          paddingVertical: 8,
-                          paddingHorizontal: 12,
-                          borderRadius: 6,
-                          opacity: loading ? 0.6 : 1,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: "white",
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          Clock Out
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                )}
-              />
-            </View>
-          )}
-
-          {/* Action Button */}
+          {/* Clock In Button */}
           <Pressable
-            onPress={handleClockInMultiple}
-            disabled={loading || selectedEmployees.size === 0}
+            onPress={handleClockIn}
+            disabled={loading || selectedEmployees.size === 0 || !selectedJobSite}
             style={{
               backgroundColor:
-                selectedEmployees.size === 0 ? colors.border : colors.primary,
+                selectedEmployees.size > 0 && selectedJobSite
+                  ? colors.success
+                  : colors.border,
               paddingVertical: 16,
-              borderRadius: 8,
-              alignItems: "center",
-              opacity: loading || selectedEmployees.size === 0 ? 0.6 : 1,
+              borderRadius: 12,
+              alignItems: 'center',
+              opacity: loading ? 0.6 : 1,
             }}
           >
-            <Text className="text-base font-semibold text-white">
-              Clock In {selectedEmployees.size > 0 ? `(${selectedEmployees.size})` : ""}
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '700',
+                color:
+                  selectedEmployees.size > 0 && selectedJobSite
+                    ? 'white'
+                    : colors.muted,
+              }}
+            >
+              {loading ? 'Clocking In...' : 'Clock In'}
             </Text>
           </Pressable>
 
-          {/* Message */}
-          {message && (
-            <View
+          {/* Management Links */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Pressable
+              onPress={() => router.push('/employees-management')}
               style={{
-                backgroundColor: colors.success,
+                flex: 1,
+                backgroundColor: colors.surface,
                 paddingVertical: 12,
-                paddingHorizontal: 16,
                 borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: colors.border,
               }}
             >
-              <Text className="text-sm font-medium text-white text-center">{message}</Text>
-            </View>
-          )}
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
+                Manage Employees
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/jobs-management')}
+              style={{
+                flex: 1,
+                backgroundColor: colors.surface,
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
+                Manage Jobs
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </ScreenContainer>

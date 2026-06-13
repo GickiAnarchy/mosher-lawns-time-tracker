@@ -19,6 +19,11 @@ export interface TimeLog {
   clockOutTime: number | null;
 }
 
+export interface MosherAdmin {
+  id: string;
+  employeeData: Employee;
+}
+
 const STORAGE_KEYS = {
   EMPLOYEES: 'employees',
   JOB_SITES: 'job_sites',
@@ -303,3 +308,8 @@ export async function getEmployeeSummary(employeeId: string, startDate: Date, en
     return { totalHours: 0, entries: [] };
   }
 }
+
+
+  // MosherAdmin
+
+//export

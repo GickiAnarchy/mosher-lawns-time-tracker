@@ -20,14 +20,14 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Clock In/Out',
-          tabBarLabel: 'Clock In/Out',
+          tabBarLabel: 'Clock',
         }}
       />
       <Tabs.Screen
         name="logs"
         options={{
           title: 'Time Logs',
-          tabBarLabel: 'Logs',
+          tabBarLabel: 'History',
         }}
       />
     </Tabs>

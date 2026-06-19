@@ -9,6 +9,8 @@ export interface JobSite {
   id: string;
   name: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface TimeLog {
@@ -101,7 +103,7 @@ export async function getJobSites(): Promise<JobSite[]> {
   }
 }
 
-export async function addJobSite(name: string, location: string): Promise<JobSite | null> {
+export async function addJobSite(name: string, location: string, latitude?: number, longitude?: number): Promise<JobSite | null> {
   try {
     const jobSites = await getJobSites();
     // Check for duplicate name
@@ -113,6 +115,8 @@ export async function addJobSite(name: string, location: string): Promise<JobSit
       id: Date.now().toString(),
       name,
       location,
+      latitude,
+      longitude,
     };
     jobSites.push(newJobSite);
     await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(jobSites));
@@ -123,13 +127,15 @@ export async function addJobSite(name: string, location: string): Promise<JobSit
   }
 }
 
-export async function updateJobSite(id: string, name: string, location: string): Promise<void> {
+export async function updateJobSite(id: string, name: string, location: string, latitude?: number, longitude?: number): Promise<void> {
   try {
     const sites = await getJobSites();
     const index = sites.findIndex(s => s.id === id);
     if (index !== -1) {
       sites[index].name = name;
       sites[index].location = location;
+      sites[index].latitude = latitude;
+      sites[index].longitude = longitude;
       await AsyncStorage.setItem(STORAGE_KEYS.JOB_SITES, JSON.stringify(sites));
     }
   } catch (error) {

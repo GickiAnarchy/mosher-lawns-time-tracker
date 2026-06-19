@@ -102,41 +102,7 @@ export default function LogsScreen() {
             </Text>
           </View>
 
-          {/* Management Buttons */}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() => router.push('/employees-management')}
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
-                Manage Employees
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/jobs-management')}
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
-                Manage Jobs
-              </Text>
-            </Pressable>
-          </View>
+
 
           {/* Logs List Section */}
           <View style={{ gap: 12 }}>

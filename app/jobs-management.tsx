@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, FlatList, TextInput, Alert, ActivityIndicator, Linking } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useRouter } from 'expo-router';
 import * as Storage from '@/lib/local-storage';
 import { useColors } from '@/hooks/use-colors';
+import * as Location from 'expo-location';
 
 export default function JobsManagementScreen() {
   const router = useRouter();
@@ -11,10 +12,15 @@ export default function JobsManagementScreen() {
   const [jobs, setJobs] = useState<Storage.JobSite[]>([]);
   const [newJobName, setNewJobName] = useState('');
   const [newJobLocation, setNewJobLocation] = useState('');
+  const [newJobCoords, setNewJobCoords] = useState<{lat: number, lon: number} | null>(null);
+  
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [editingJobName, setEditingJobName] = useState('');
   const [editingJobLocation, setEditingJobLocation] = useState('');
+  const [editingJobCoords, setEditingJobCoords] = useState<{lat: number, lon: number} | null>(null);
+  
   const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -30,17 +36,51 @@ export default function JobsManagementScreen() {
     }
   };
 
+  const getCurrentLocation = async (isEditing: boolean) => {
+    try {
+      setLocationLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access location was denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const coords = {
+        lat: location.coords.latitude,
+        lon: location.coords.longitude,
+      };
+
+      if (isEditing) {
+        setEditingJobCoords(coords);
+      } else {
+        setNewJobCoords(coords);
+      }
+      Alert.alert('Success', 'Current GPS location attached');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to get current location');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const handleAddJob = async () => {
     if (!newJobName.trim() || !newJobLocation.trim()) {
       Alert.alert('Error', 'Please enter job name and location');
       return;
     }
-    const result = await Storage.addJobSite(newJobName, newJobLocation);
+    const result = await Storage.addJobSite(
+      newJobName, 
+      newJobLocation, 
+      newJobCoords?.lat, 
+      newJobCoords?.lon
+    );
     if (result === null) {
       Alert.alert('Error', 'Job site with this name already exists');
     } else {
       setNewJobName('');
       setNewJobLocation('');
+      setNewJobCoords(null);
       loadData();
       Alert.alert('Success', 'Job added');
     }
@@ -51,10 +91,17 @@ export default function JobsManagementScreen() {
       Alert.alert('Error', 'Please enter job name and location');
       return;
     }
-    await Storage.updateJobSite(id, editingJobName, editingJobLocation);
+    await Storage.updateJobSite(
+      id, 
+      editingJobName, 
+      editingJobLocation, 
+      editingJobCoords?.lat, 
+      editingJobCoords?.lon
+    );
     setEditingJobId(null);
     setEditingJobName('');
     setEditingJobLocation('');
+    setEditingJobCoords(null);
     loadData();
     Alert.alert('Success', 'Job updated');
   };
@@ -71,6 +118,19 @@ export default function JobsManagementScreen() {
         },
       },
     ]);
+  };
+
+  const openInMaps = (lat: number, lon: number, label: string) => {
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = `${lat},${lon}`;
+    const url = Platform.select({
+      ios: `${scheme}${label}@${latLng}`,
+      android: `${scheme}${latLng}(${label})`
+    });
+    
+    if (url) {
+      Linking.openURL(url);
+    }
   };
 
   if (loading && jobs.length === 0) {
@@ -96,7 +156,7 @@ export default function JobsManagementScreen() {
               Manage Job Sites
             </Text>
             <Text style={{ fontSize: 14, color: colors.muted }}>
-              Add, edit, or delete job sites
+              Add, edit, or delete job sites with GPS
             </Text>
           </View>
 
@@ -144,6 +204,31 @@ export default function JobsManagementScreen() {
               }}
               placeholderTextColor={colors.muted}
             />
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                onPress={() => getCurrentLocation(false)}
+                disabled={locationLoading}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.primary,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  opacity: locationLoading ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: 'white' }}>
+                  {locationLoading ? 'Getting Location...' : 'Get Current GPS'}
+                </Text>
+              </Pressable>
+              {newJobCoords && (
+                <Text style={{ fontSize: 12, color: colors.success, fontWeight: '600' }}>
+                  ✓ GPS Attached
+                </Text>
+              )}
+            </View>
+
             <Pressable
               onPress={handleAddJob}
               disabled={loading}
@@ -153,6 +238,7 @@ export default function JobsManagementScreen() {
                 borderRadius: 8,
                 alignItems: 'center',
                 opacity: loading ? 0.6 : 1,
+                marginTop: 4,
               }}
             >
               <Text style={{ fontSize: 14, fontWeight: '600', color: 'white' }}>
@@ -231,6 +317,23 @@ export default function JobsManagementScreen() {
                           }}
                           placeholderTextColor={colors.muted}
                         />
+                        
+                        <Pressable
+                          onPress={() => getCurrentLocation(true)}
+                          disabled={locationLoading}
+                          style={{
+                            backgroundColor: colors.primary,
+                            paddingVertical: 10,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            opacity: locationLoading ? 0.6 : 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: 'white' }}>
+                            {locationLoading ? 'Getting Location...' : 'Update GPS to Current'}
+                          </Text>
+                        </Pressable>
+
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
                             onPress={() => handleUpdateJob(item.id)}
@@ -247,7 +350,10 @@ export default function JobsManagementScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => setEditingJobId(null)}
+                            onPress={() => {
+                              setEditingJobId(null);
+                              setEditingJobCoords(null);
+                            }}
                             style={{
                               flex: 1,
                               backgroundColor: colors.border,
@@ -264,13 +370,25 @@ export default function JobsManagementScreen() {
                       </View>
                     ) : (
                       <View style={{ gap: 12 }}>
-                        <View>
-                          <Text style={{ fontSize: 16, fontWeight: '500', color: colors.foreground }}>
-                            {item.name}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
-                            {item.location}
-                          </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 16, fontWeight: '500', color: colors.foreground }}>
+                              {item.name}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                              {item.location}
+                            </Text>
+                            {item.latitude && item.longitude && (
+                              <Pressable 
+                                onPress={() => openInMaps(item.latitude!, item.longitude!, item.name)}
+                                style={{ marginTop: 8 }}
+                              >
+                                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+                                  📍 View on Map ({item.latitude.toFixed(4)}, {item.longitude.toFixed(4)})
+                                </Text>
+                              </Pressable>
+                            )}
+                          </View>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
@@ -278,6 +396,9 @@ export default function JobsManagementScreen() {
                               setEditingJobId(item.id);
                               setEditingJobName(item.name);
                               setEditingJobLocation(item.location);
+                              if (item.latitude && item.longitude) {
+                                setEditingJobCoords({ lat: item.latitude, lon: item.longitude });
+                              }
                             }}
                             style={{
                               flex: 1,

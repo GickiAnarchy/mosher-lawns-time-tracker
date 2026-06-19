@@ -357,38 +357,21 @@ export default function ClockInOutScreen() {
             </Text>
           </Pressable>
 
-          {/* Management Links */}
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+          {/* Management Link */}
+          <View style={{ marginTop: 8 }}>
             <Pressable
-              onPress={() => router.push('/employees-management')}
+              onPress={() => router.push('/data-management')}
               style={{
-                flex: 1,
                 backgroundColor: colors.surface,
-                paddingVertical: 12,
-                borderRadius: 8,
+                paddingVertical: 14,
+                borderRadius: 12,
                 alignItems: 'center',
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
-                Manage Employees
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/jobs-management')}
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
-                Manage Jobs
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>
+                ⚙️ Admin & Data Management
               </Text>
             </Pressable>
           </View>

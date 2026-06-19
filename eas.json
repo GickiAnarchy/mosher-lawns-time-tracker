@@ -1,11 +1,6 @@
 {
   "cli": {
-    "version": ">= 12.0.0",
-    "appExtensions": {
-      "expo-location": {
-        "foregroundLocation": "Allow Mosher Lawns to access your location."
-      }
-    }
+    "version": ">= 12.0.0"
   },
   "build": {
     "development": {
@@ -27,3 +22,4 @@
     "production": {}
   }
 }
+

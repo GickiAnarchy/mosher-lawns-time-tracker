@@ -2,6 +2,7 @@
   "expo": {
     "name": "Mosher Lawns Time Tracker",
     "slug": "mosher-lawns-time-tracker",
+    "owner": "gickianarchy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

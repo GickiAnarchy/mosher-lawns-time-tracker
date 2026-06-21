@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mosher Lawns Time Tracker",
     "slug": "mosher-lawns-time-tracker",
-    "owner": "mindofmagick",
+    "owner": "your-expo-username",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -59,6 +59,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-        }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    }
   }
 }

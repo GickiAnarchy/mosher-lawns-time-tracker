@@ -1,4 +1,4 @@
-name: EAS Build20
+name: EAS Build
 on:
   workflow_dispatch:
     inputs:

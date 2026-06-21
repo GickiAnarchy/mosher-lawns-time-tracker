@@ -1,4 +1,4 @@
-name: EAS Build-20
+name: EAS Build20
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +23,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Setup EAS
         uses: expo/expo-github-action@v8
@@ -32,7 +31,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Build on EAS
         run: eas build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive
